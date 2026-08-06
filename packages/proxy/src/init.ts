@@ -132,12 +132,31 @@ export interface InitFlags {
   unwrap?: boolean;
   /** Path to a fuse.config.json to bake into every wrapped entry. */
   fuseConfig?: string;
+  /** Process every discovered config, not just the nearest one. */
+  all?: boolean;
+}
+
+/**
+ * Least-surprise scoping: a project config in cwd wins; global host configs are
+ * only touched with --all (or --file). Never silently modify a global config
+ * while the user is thinking about their project.
+ */
+export function selectLocations(discovered: ConfigLocation[], all: boolean): {
+  selected: ConfigLocation[];
+  deferred: ConfigLocation[];
+} {
+  if (all || discovered.length <= 1) return { selected: discovered, deferred: [] };
+  const project = discovered.filter((c) => c.host.includes("project"));
+  if (project.length > 0) {
+    return { selected: project, deferred: discovered.filter((c) => !c.host.includes("project")) };
+  }
+  return { selected: [discovered[0]], deferred: discovered.slice(1) };
 }
 
 export function runInit(flags: InitFlags): number {
-  const locations: ConfigLocation[] = flags.file
-    ? [{ host: "custom", file: path.resolve(flags.file) }]
-    : discoverConfigs();
+  const { selected: locations, deferred } = flags.file
+    ? { selected: [{ host: "custom", file: path.resolve(flags.file) }], deferred: [] }
+    : selectLocations(discoverConfigs(), flags.all ?? false);
 
   if (locations.length === 0) {
     console.error(
@@ -178,6 +197,9 @@ export function runInit(flags: InitFlags): number {
     copyFileSync(file, `${file}.mcp-fuse-backup`);
     writeFileSync(file, JSON.stringify(report.config, null, 2) + "\n");
     console.error(`  backup: ${file}.mcp-fuse-backup`);
+  }
+  for (const { host, file } of deferred) {
+    console.error(`– not touching ${host} (${file}) — run with --all or --file to include it`);
   }
   if (!flags.dryRun && !flags.unwrap) {
     console.error("\nRestart your MCP host (or reload its servers) to pick up the change.");

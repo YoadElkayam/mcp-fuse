@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   isWrapped,
+  selectLocations,
   transformConfig,
   unwrapEntry,
   wrapEntry,
@@ -58,6 +59,23 @@ test("transformConfig wraps stdio entries, skips HTTP and already-wrapped ones",
   assert.equal(report.config.otherTopLevelKey, true);
   assert.ok(isWrapped(report.config.mcpServers!.files));
   assert.deepEqual(report.config.mcpServers!.remote, config.mcpServers!.remote);
+});
+
+test("selectLocations: project config wins; globals need --all", () => {
+  const project = { host: "Claude Code (project)", file: "/repo/.mcp.json" };
+  const cursor = { host: "Cursor", file: "/home/.cursor/mcp.json" };
+  const desktop = { host: "Claude Desktop", file: "/home/claude_desktop_config.json" };
+
+  const scoped = selectLocations([project, cursor, desktop], false);
+  assert.deepEqual(scoped.selected, [project]);
+  assert.deepEqual(scoped.deferred, [cursor, desktop]);
+
+  const all = selectLocations([project, cursor, desktop], true);
+  assert.equal(all.selected.length, 3);
+  assert.equal(all.deferred.length, 0);
+
+  const single = selectLocations([desktop], false);
+  assert.deepEqual(single.selected, [desktop]);
 });
 
 test("transformConfig --unwrap restores wrapped entries and leaves others alone", () => {

@@ -9,15 +9,16 @@ changes.
 npx mcp-fuse init
 ```
 
-Finds your MCP config (`./.mcp.json` for Claude Code projects, Cursor's
-`~/.cursor/mcp.json`, Claude Desktop's config), rewrites every stdio server entry to
-run behind the proxy, and writes a `.mcp-fuse-backup` next to each file it touches.
-Then restart your host.
+Finds your MCP config, rewrites every stdio server entry to run behind the proxy,
+and writes a `.mcp-fuse-backup` next to each file it touches. Then restart your
+host. Scoping is least-surprise: a project `./.mcp.json` wins when present; global
+host configs (Cursor, Claude Desktop) are only touched with `--all` or `--file`.
 
 Useful variants:
 
 ```bash
 npx mcp-fuse init --dry-run              # show what would change, write nothing
+npx mcp-fuse init --all                  # include global host configs (Cursor, Claude Desktop)
 npx mcp-fuse init --file ./my.mcp.json   # a specific config file
 npx mcp-fuse init --unwrap               # undo
 npx mcp-fuse init --fuse-config ./fuse.config.json   # bake in custom policy

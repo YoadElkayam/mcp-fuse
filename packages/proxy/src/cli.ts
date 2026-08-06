@@ -22,8 +22,9 @@ function usage(): never {
   console.error(
     [
       "Usage:",
-      "  mcp-fuse init [--file <mcp-config>] [--dry-run] [--unwrap] [--fuse-config <file>]",
+      "  mcp-fuse init [--file <mcp-config>] [--all] [--dry-run] [--unwrap] [--fuse-config <file>]",
       "      Wrap every stdio server in your host's MCP config (Claude Code/Desktop, Cursor).",
+      "      Targets the project .mcp.json when present; add --all for global host configs too.",
       "  mcp-fuse wrap [--config <file>] [--verbose] [--log-file <file>] -- <server command...>",
       "      Run one MCP server behind the resilience proxy.",
       "  mcp-fuse proxy --target <url> [--port <port>]      (not yet implemented)",
@@ -47,6 +48,7 @@ switch (command) {
         dryRun: rest.includes("--dry-run"),
         unwrap: rest.includes("--unwrap"),
         fuseConfig: flagValue(rest, "--fuse-config"),
+        all: rest.includes("--all"),
       }),
     );
     break;
