@@ -11,6 +11,8 @@ permissions:
 jobs:
   publish:
     runs-on: ubuntu-latest
+    env:
+      NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -23,6 +25,10 @@ jobs:
       - run: pnpm build
       - run: pnpm test
       - name: Publish to npm
+        if: env.NPM_TOKEN != ''
         run: pnpm -r publish --access public --no-git-checks
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      - name: Skipped publish notice
+        if: env.NPM_TOKEN == ''
+        run: echo "NPM_TOKEN secret not set — build/test ran, npm publish skipped (publish manually or add the secret)"

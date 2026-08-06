@@ -1,8 +1,12 @@
 # mcp-fuse
 
+[![CI](https://github.com/YoadElkayam/mcp-fuse/actions/workflows/ci.yml/badge.svg)](https://github.com/YoadElkayam/mcp-fuse/actions/workflows/ci.yml)
+[![npm](https://img.shields.io/npm/v/mcp-fuse)](https://www.npmjs.com/package/mcp-fuse)
+[![license](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+
 **Deterministic failure handling for MCP. Stop letting your LLM debug your network.**
 
-> Status: **pre-alpha** — spec draft + working stdio proxy (M2). Not yet published to npm.
+> Status: **alpha** — working stdio proxy + MEP spec draft, published to npm. HTTP proxy mode and the official-spec (SEP) push are on the [roadmap](docs/DESIGN.md).
 
 ## The problem
 
