@@ -11,7 +11,7 @@ import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
-import { ERROR_POLICY_META_KEY, type ErrorPolicy } from "@mcp-fuse/core";
+import { ERROR_POLICY_META_KEY, type ErrorPolicy } from "mcp-fuse-core";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const cliJs = path.resolve(here, "../dist/cli.js");

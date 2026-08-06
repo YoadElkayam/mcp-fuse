@@ -35,8 +35,20 @@ the future Java port. Schema changes require:
 - Additive-only changes within version `1`
 - A new example payload in `spec/examples/` exercising the new field
 
+## Releasing (maintainers)
+
+Versions follow semver; `mcp-fuse` and `mcp-fuse-core` release together.
+
+1. Bump `version` in `packages/core/package.json` and `packages/proxy/package.json`.
+2. Commit, then tag: `git tag v0.x.y && git push --tags`.
+3. The `Release` workflow builds, tests, and publishes both packages to npm with
+   provenance. It needs an `NPM_TOKEN` repository secret (npm automation token).
+
+Manual fallback: `npm login`, then `pnpm -r publish --access public` from a clean
+checkout.
+
 ## Conventions
 
 - Commits: `type(scope): message` — e.g. `feat(core): classify grpc RESOURCE_EXHAUSTED`
 - Branches: `feat/`, `fix/`, `chore/`
-- All code TypeScript-strict; `@mcp-fuse/core` stays zero-runtime-dependency.
+- All code TypeScript-strict; `mcp-fuse-core` stays zero-runtime-dependency.

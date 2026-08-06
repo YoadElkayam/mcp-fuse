@@ -17,6 +17,7 @@
  * and no client capabilities, because the child must be connected before the
  * host's initialize arrives (we mirror child→host, not host→child).
  */
+import { appendFileSync } from "node:fs";
 import { setTimeout as sleep } from "node:timers/promises";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
@@ -42,7 +43,7 @@ import {
   silentRetryAllowed,
   type CircuitBreakerOptions,
   type ErrorPolicy,
-} from "@mcp-fuse/core";
+} from "mcp-fuse-core";
 
 const PassthroughSchema = z.object({}).passthrough();
 
@@ -60,6 +61,11 @@ export interface StdioProxyOptions {
   maxAbsorptionWithProgressMs?: number;
   circuit?: CircuitBreakerOptions;
   tools?: Record<string, ToolOverride>;
+  /** Print suppressed raw errors and retry activity to stderr. */
+  verbose?: boolean;
+  /** Append a JSONL record for every suppressed error / absorbed retry / circuit
+   * event. Nothing the fuse hides is ever unrecoverable — this is the audit log. */
+  logFile?: string;
 }
 
 interface Failure {
@@ -113,7 +119,7 @@ export class StdioProxy {
     });
 
     this.server.setRequestHandler(CallToolRequestSchema, (req, extra) =>
-      this.interceptToolCall(req.params, extra.sendNotification.bind(extra)),
+      this.interceptToolCall(req.params, extra.sendNotification.bind(extra), extra.signal),
     );
 
     this.server.onclose = () => void this.shutdown(0);
@@ -130,8 +136,14 @@ export class StdioProxy {
 
   private async connectChild(): Promise<void> {
     const [cmd, ...args] = this.options.command;
-    const transport = new StdioClientTransport({ command: cmd, args, stderr: "inherit" });
-    const client = new Client({ name: "mcp-fuse", version: "0.0.1" });
+    // Full env inheritance: the host set API keys etc. on OUR process intending
+    // them for the real server — the SDK's default minimal child env would strip
+    // them and break wrapped servers in confusing ways.
+    const env = Object.fromEntries(
+      Object.entries(process.env).filter((e): e is [string, string] => e[1] !== undefined),
+    );
+    const transport = new StdioClientTransport({ command: cmd, args, env, stderr: "inherit" });
+    const client = new Client({ name: "mcp-fuse", version: "0.1.0" });
 
     client.fallbackNotificationHandler = async (notification) => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -151,6 +163,10 @@ export class StdioProxy {
     await client.connect(transport);
     client.onclose = () => {
       this.childAlive = false;
+      if (!this.shuttingDown) {
+        console.error("[mcp-fuse] child server connection closed; will attempt restart on next tool call");
+        this.log({ event: "child_closed" });
+      }
     };
     this.client = client;
     this.childAlive = true;
@@ -211,6 +227,7 @@ export class StdioProxy {
   private async interceptToolCall(
     params: { name: string; _meta?: { progressToken?: string | number }; [k: string]: unknown },
     sendNotification: (n: { method: string; params?: Record<string, unknown> }) => Promise<void>,
+    signal?: AbortSignal,
   ): Promise<CallToolResult> {
     const name = params.name;
     const breaker = this.breakers.for(name);
@@ -230,7 +247,7 @@ export class StdioProxy {
     for (;;) {
       attempt += 1;
       const remaining = deadline - Date.now();
-      if (remaining <= 0) break;
+      if (remaining <= 0 || signal?.aborted) break;
       const t0 = Date.now();
       try {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -240,6 +257,7 @@ export class StdioProxy {
           {
             timeout: Math.max(remaining, 1),
             resetTimeoutOnProgress: true,
+            signal,
             onprogress:
               hostToken !== undefined
                 ? (p: Record<string, unknown>) =>
@@ -300,6 +318,18 @@ export class StdioProxy {
       }
 
       this.metrics.recordAbsorbedRetry();
+      if (this.options.verbose) {
+        console.error(
+          `[mcp-fuse] ${name}: ${failure.policy.category} (attempt ${attempt}); retrying in ${decision.delayMs}ms`,
+        );
+      }
+      this.log({
+        event: "absorbed_retry",
+        tool: name,
+        attempt,
+        category: failure.policy.category,
+        delayMs: decision.delayMs,
+      });
       if (hostToken !== undefined) {
         void sendNotification({
           method: "notifications/progress",
@@ -316,8 +346,23 @@ export class StdioProxy {
     // Terminal failure: one semantic message, raw payload suppressed.
     const stateBefore = breaker.state();
     const stateAfter = breaker.recordFailure();
-    if (stateAfter === "open" && stateBefore !== "open") this.metrics.recordCircuitOpened();
+    if (stateAfter === "open" && stateBefore !== "open") {
+      this.metrics.recordCircuitOpened();
+      this.log({ event: "circuit_opened", tool: name });
+    }
     this.metrics.recordSuppressedError(failure?.rawText ?? "");
+    if (this.options.verbose && failure) {
+      console.error(
+        `[mcp-fuse] ${name}: suppressed ${failure.policy.category} after ${attempt} attempt(s); raw error:\n${failure.rawText}`,
+      );
+    }
+    this.log({
+      event: "suppressed_error",
+      tool: name,
+      attempts: attempt,
+      category: failure?.policy.category,
+      raw: failure?.rawText,
+    });
 
     const policy = failure?.policy ?? {
       version: "1" as const,
@@ -350,6 +395,20 @@ export class StdioProxy {
       isError: true,
       _meta: { [ERROR_POLICY_META_KEY]: policy },
     };
+  }
+
+  // ----------------------------------------------------------------- logging
+
+  private log(record: Record<string, unknown>): void {
+    if (!this.options.logFile) return;
+    try {
+      appendFileSync(
+        this.options.logFile,
+        JSON.stringify({ ts: new Date().toISOString(), ...record }) + "\n",
+      );
+    } catch {
+      // never let the audit log break the proxy
+    }
   }
 
   // ---------------------------------------------------------------- shutdown

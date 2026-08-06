@@ -43,18 +43,22 @@ Two pieces, shipped together:
 
 ## Quickstart
 
-Wrap any stdio MCP server (working today — run from a checkout until npm publish):
+Protect **every MCP server you have** with one command — it finds your host's MCP
+config (Claude Code, Claude Desktop, Cursor), wraps each stdio server, and writes
+backups:
 
 ```bash
-mcp-fuse wrap -- node ./my-mcp-server.js
-mcp-fuse wrap --config fuse.config.json -- npx @modelcontextprotocol/server-github
+npx mcp-fuse init            # add --dry-run to preview, --unwrap to undo
 ```
 
-Or front a Streamable HTTP server (M3, not yet implemented):
+Or wrap a single server:
 
 ```bash
-mcp-fuse proxy --target http://localhost:8085/mcp --port 9090
+npx mcp-fuse wrap -- npx -y @modelcontextprotocol/server-github
 ```
+
+Full guide (config reference, debugging, troubleshooting): [docs/QUICKSTART.md](docs/QUICKSTART.md).
+HTTP/Streamable servers aren't wrappable yet (M3 on the [roadmap](docs/DESIGN.md)).
 
 That's it. Rate limits get honored, transient failures get retried with exponential
 backoff, dead services get circuit-broken — and your agent sees at most one clean
@@ -67,8 +71,8 @@ message like:
 | Path | Contents |
 |------|----------|
 | [`spec/`](spec/) | The MEP spec draft + JSON Schema + example payloads |
-| [`packages/core`](packages/core/) | `@mcp-fuse/core` — types, error classifier, retry engine, circuit breaker |
-| [`packages/proxy`](packages/proxy/) | `@mcp-fuse/proxy` — the CLI + stdio/HTTP proxies |
+| [`packages/core`](packages/core/) | `mcp-fuse-core` — types, error classifier, retry engine, circuit breaker |
+| [`packages/proxy`](packages/proxy/) | `mcp-fuse` — the CLI + stdio/HTTP proxies |
 | [`middleware-java/`](middleware-java/) | Planned Java middleware (Spring/servlet filter) |
 | [`docs/DESIGN.md`](docs/DESIGN.md) | Full design plan and roadmap |
 | [`examples/`](examples/) | Runnable demos (flaky server + agent, before/after) |

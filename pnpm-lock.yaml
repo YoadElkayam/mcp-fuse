@@ -14,18 +14,18 @@ importers:
 
   examples/flaky-server:
     dependencies:
-      '@mcp-fuse/core':
-        specifier: workspace:*
-        version: link:../../packages/core
-      '@mcp-fuse/proxy':
-        specifier: workspace:*
-        version: link:../../packages/proxy
       '@modelcontextprotocol/sdk':
         specifier: ^1.15.0
         version: 1.30.0(zod@3.25.76)
       gpt-tokenizer:
         specifier: ^2.8.0
         version: 2.9.0
+      mcp-fuse:
+        specifier: workspace:*
+        version: link:../../packages/proxy
+      mcp-fuse-core:
+        specifier: workspace:*
+        version: link:../../packages/core
       zod:
         specifier: ^3.24.0
         version: 3.25.76
@@ -48,12 +48,12 @@ importers:
 
   packages/proxy:
     dependencies:
-      '@mcp-fuse/core':
-        specifier: workspace:*
-        version: link:../core
       '@modelcontextprotocol/sdk':
         specifier: ^1.15.0
         version: 1.30.0(zod@3.25.76)
+      mcp-fuse-core:
+        specifier: workspace:*
+        version: link:../core
       zod:
         specifier: ^3.24.0
         version: 3.25.76

@@ -153,7 +153,7 @@ get better resilience for free — the standard incentivizes accurate annotation
 3. **Library middleware**: `withFuse(transport, policy?)` wrapping a TS-SDK transport,
    for teams embedding clients. (Java equivalent later, see §7.)
 
-All three share `@mcp-fuse/core`; the proxies are thin shells.
+All three share `mcp-fuse-core`; the proxies are thin shells.
 
 ### 4.2 Request pipeline
 
@@ -268,8 +268,8 @@ report.
 
 | Package | Contents |
 |---------|----------|
-| `@mcp-fuse/core` | MEP types, JSON Schema, classifier, retry engine, circuit breaker, metrics. Zero runtime deps. |
-| `@mcp-fuse/proxy` | CLI (`wrap`, `proxy`), stdio proxy, HTTP proxy. Depends on core (+ `@modelcontextprotocol/sdk` where useful). |
+| `mcp-fuse-core` | MEP types, JSON Schema, classifier, retry engine, circuit breaker, metrics. Zero runtime deps. |
+| `mcp-fuse` | CLI (`wrap`, `proxy`), stdio proxy, HTTP proxy. Depends on core (+ `@modelcontextprotocol/sdk` where useful). |
 | `spec/` | Prose spec + JSON Schema + conformance examples (language-neutral; the Java port implements from here). |
 
 ## 6. Roadmap
@@ -277,7 +277,7 @@ report.
 | Milestone | Deliverable | Exit criterion |
 |-----------|-------------|----------------|
 | **M0 — Spec draft** | `spec/` v1alpha: schema, transport mapping, category semantics | Schema validates all examples; 2 external reviewers read it |
-| **M1 — Core engine** | classifier + retry + breaker in `@mcp-fuse/core`, fully unit-tested | Classifier corpus ≥ 50 real-world error samples, all categorized correctly |
+| **M1 — Core engine** | classifier + retry + breaker in `mcp-fuse-core`, fully unit-tested | Classifier corpus ≥ 50 real-world error samples, all categorized correctly |
 | **M2 — stdio wrapper MVP** | `mcp-fuse wrap` works with real servers (filesystem, fetch, the flaky demo server) | Demo: agent + flaky server, before/after token counts across scripted scenarios, recorded |
 | **M3 — HTTP proxy + metrics** | `mcp-fuse proxy`, session summary, JSONL logs | Fronting a real Streamable HTTP server in CI |
 | **M4 — Launch** | npm publish, README with demo GIF + ROI numbers, blog post, submit to MCP community | First external issue filed 🎉 |
@@ -309,7 +309,7 @@ proof-point for the README and for standard adoption.
 The SDK Server/Client pair per §4.1: SDK owns framing, backpressure, handshake, and
 child reconnection; we own the interception pipeline (§4.2) and the generic
 passthrough fallback for unmapped methods and server→client flows. `tools/call`
-responses route through `@mcp-fuse/core`; on exhausted policy the response is
+responses route through `mcp-fuse-core`; on exhausted policy the response is
 reconstructed with `agentGuidance` text and the MEP payload under `_meta` /
 `error.data`. Includes the `tools/list` annotation sync that feeds the idempotency
 gate, and child-crash recovery (reconnect, replay only per the gate).

@@ -1,8 +1,16 @@
 {
-  "name": "@mcp-fuse/proxy",
-  "version": "0.0.1",
+  "name": "mcp-fuse",
+  "version": "0.1.0",
   "description": "Zero-config MCP resilience proxy: wrap any MCP server, stop token-burning error loops",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/YoadElkayam/mcp-fuse.git",
+    "directory": "packages/proxy"
+  },
+  "homepage": "https://github.com/YoadElkayam/mcp-fuse#readme",
+  "bugs": "https://github.com/YoadElkayam/mcp-fuse/issues",
+  "keywords": ["mcp", "model-context-protocol", "proxy", "resilience", "retry", "circuit-breaker", "rate-limit", "llm", "agents", "claude", "cursor"],
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -16,7 +24,7 @@
     "lint": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@mcp-fuse/core": "workspace:*",
+    "mcp-fuse-core": "workspace:*",
     "@modelcontextprotocol/sdk": "^1.15.0",
     "zod": "^3.24.0"
   },

@@ -38,7 +38,7 @@ Env: `FLAKY_TELEMETRY=/path/to/file.jsonl` appends a JSONL record per tool call
 Simulates the pathological naive-agent loop (retry immediately until success or max
 attempts) against a real SDK client connection, counts tokens over the exact
 agent-visible bytes, and prints the with/without-fuse comparison — the "with" side
-uses the actual `@mcp-fuse/core` classifier to generate the one guidance message:
+uses the actual `mcp-fuse-core` classifier to generate the one guidance message:
 
 ```bash
 node dist/bench.js --scenario rate-limit-storm

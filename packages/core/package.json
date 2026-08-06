@@ -1,8 +1,16 @@
 {
-  "name": "@mcp-fuse/core",
-  "version": "0.0.1",
-  "description": "MCP Error Policy (MEP) types, classifier, retry engine, and circuit breaker",
+  "name": "mcp-fuse-core",
+  "version": "0.1.0",
+  "description": "MCP Error Policy (MEP) types, classifier, retry engine, and circuit breaker — the engine behind mcp-fuse",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/YoadElkayam/mcp-fuse.git",
+    "directory": "packages/core"
+  },
+  "homepage": "https://github.com/YoadElkayam/mcp-fuse#readme",
+  "bugs": "https://github.com/YoadElkayam/mcp-fuse/issues",
+  "keywords": ["mcp", "model-context-protocol", "resilience", "retry", "circuit-breaker", "error-policy", "llm", "agents"],
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
