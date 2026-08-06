@@ -1,0 +1,11 @@
+{
+  "version": "1",
+  "category": "transient",
+  "retryable": false,
+  "circuit": {
+    "state": "open",
+    "reopenAfterMs": 30000
+  },
+  "agentGuidance": "Tool \"search\" is unavailable (service down, circuit open for 30s). Do not retry; use an alternative approach or inform the user.",
+  "detail": "5 consecutive ECONNREFUSED to localhost:8085 within 20s"
+}

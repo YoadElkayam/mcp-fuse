@@ -1,0 +1,7 @@
+{
+  "version": "1",
+  "category": "auth",
+  "retryable": false,
+  "agentGuidance": "The GitHub tool's credentials are invalid or expired. Retrying cannot fix this; tell the user to re-authenticate.",
+  "detail": "upstream returned HTTP 401 (token expired at 2026-08-05T22:14:00Z)"
+}

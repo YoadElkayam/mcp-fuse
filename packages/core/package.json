@@ -1,0 +1,19 @@
+{
+  "name": "@mcp-fuse/core",
+  "version": "0.0.1",
+  "description": "MCP Error Policy (MEP) types, classifier, retry engine, and circuit breaker",
+  "license": "MIT",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": ["dist", "README.md"],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "tsc -p tsconfig.test.json && node --test dist-test/*.test.js",
+    "lint": "tsc -p tsconfig.json --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "typescript": "^5.7.0"
+  }
+}

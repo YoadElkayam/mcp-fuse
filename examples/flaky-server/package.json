@@ -1,0 +1,26 @@
+{
+  "name": "@mcp-fuse/example-flaky-server",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Deterministic flaky MCP server + naive-agent benchmark: the Phase 1 rig behind the mcp-fuse ROI numbers",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "tsc -p tsconfig.test.json && node --test dist-test/*.test.js",
+    "lint": "tsc -p tsconfig.json --noEmit",
+    "start": "node dist/server.js",
+    "bench": "node dist/bench.js"
+  },
+  "dependencies": {
+    "@mcp-fuse/core": "workspace:*",
+    "@mcp-fuse/proxy": "workspace:*",
+    "@modelcontextprotocol/sdk": "^1.15.0",
+    "gpt-tokenizer": "^2.8.0",
+    "zod": "^3.24.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "typescript": "^5.7.0"
+  }
+}

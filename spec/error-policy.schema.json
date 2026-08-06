@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/mcp-fuse/mcp-fuse/main/spec/error-policy.schema.json",
+  "title": "MCP Error Policy (MEP) v1",
+  "type": "object",
+  "required": ["version", "category"],
+  "additionalProperties": false,
+  "properties": {
+    "version": {
+      "const": "1",
+      "description": "MEP major version. Consumers ignore payloads with unrecognized versions."
+    },
+    "category": {
+      "enum": [
+        "transient",
+        "rate_limit",
+        "timeout",
+        "auth",
+        "permission",
+        "invalid_input",
+        "not_found",
+        "resource_exhausted",
+        "permanent",
+        "unknown"
+      ]
+    },
+    "retryable": {
+      "type": "boolean",
+      "description": "Whether retrying the identical request can ever succeed. Defaults per category."
+    },
+    "retry": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "strategy": { "enum": ["none", "fixed", "exponential"] },
+        "afterMs": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Authoritative earliest-retry delay (e.g. from Retry-After). Overrides computed backoff for the next attempt."
+        },
+        "initialDelayMs": { "type": "integer", "minimum": 0 },
+        "maxDelayMs": { "type": "integer", "minimum": 0 },
+        "maxAttempts": { "type": "integer", "minimum": 0 },
+        "jitter": { "type": "boolean" }
+      }
+    },
+    "circuit": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "state": { "enum": ["closed", "open", "half_open"] },
+        "reopenAfterMs": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "agentGuidance": {
+      "type": "string",
+      "maxLength": 500,
+      "description": "The ONLY text intended for the model. Imperative, no stack traces."
+    },
+    "detail": {
+      "type": "string",
+      "description": "Diagnostic detail for logs/humans. Never forwarded to the model."
+    },
+    "correlationId": { "type": "string" }
+  }
+}

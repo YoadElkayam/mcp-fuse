@@ -1,0 +1,27 @@
+{
+  "name": "@mcp-fuse/proxy",
+  "version": "0.0.1",
+  "description": "Zero-config MCP resilience proxy: wrap any MCP server, stop token-burning error loops",
+  "license": "MIT",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "mcp-fuse": "dist/cli.js"
+  },
+  "files": ["dist", "README.md"],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "tsc -p tsconfig.json && tsc -p tsconfig.test.json && node --test dist-test/*.test.js",
+    "lint": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@mcp-fuse/core": "workspace:*",
+    "@modelcontextprotocol/sdk": "^1.15.0",
+    "zod": "^3.24.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "typescript": "^5.7.0"
+  }
+}

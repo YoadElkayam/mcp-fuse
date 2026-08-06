@@ -1,0 +1,42 @@
+# Contributing to mcp-fuse
+
+Thanks for helping make MCP failure handling deterministic.
+
+## Setup
+
+```bash
+pnpm install
+pnpm build
+pnpm test
+```
+
+Node ≥ 20 and pnpm ≥ 9 required.
+
+## The cheapest valuable contribution: classifier corpus
+
+The zero-config classifier lives in
+[`packages/core/src/classifier.ts`](packages/core/src/classifier.ts). If you've seen
+an MCP server emit an error string that gets misclassified (or lands in `unknown`),
+open a PR that:
+
+1. Adds the real-world error text as a test case in
+   [`packages/core/src/core.test.ts`](packages/core/src/core.test.ts)
+2. Adds/adjusts a rule so it classifies correctly
+
+Rules must be conservative: when in doubt, prefer `unknown` (one retry) over a
+confident wrong category.
+
+## Spec changes
+
+The MEP schema ([`spec/`](spec/)) is the contract for every implementation, including
+the future Java port. Schema changes require:
+
+- An issue describing the use case first
+- Additive-only changes within version `1`
+- A new example payload in `spec/examples/` exercising the new field
+
+## Conventions
+
+- Commits: `type(scope): message` — e.g. `feat(core): classify grpc RESOURCE_EXHAUSTED`
+- Branches: `feat/`, `fix/`, `chore/`
+- All code TypeScript-strict; `@mcp-fuse/core` stays zero-runtime-dependency.

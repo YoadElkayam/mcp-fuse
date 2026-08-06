@@ -1,0 +1,13 @@
+{
+  "version": "1",
+  "category": "rate_limit",
+  "retryable": true,
+  "retry": {
+    "strategy": "fixed",
+    "afterMs": 12000,
+    "maxAttempts": 3
+  },
+  "agentGuidance": "The search service is rate limited. The system retries automatically; do not re-invoke this tool yourself.",
+  "detail": "upstream returned HTTP 429, Retry-After: 12",
+  "correlationId": "req_8f3a"
+}
