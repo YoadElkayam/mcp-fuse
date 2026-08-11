@@ -11,6 +11,7 @@
   "homepage": "https://github.com/YoadElkayam/mcp-fuse#readme",
   "bugs": "https://github.com/YoadElkayam/mcp-fuse/issues",
   "keywords": ["mcp", "model-context-protocol", "proxy", "resilience", "retry", "circuit-breaker", "rate-limit", "llm", "agents", "claude", "cursor"],
+  "author": "Yoad Elkayam (https://github.com/YoadElkayam)",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
