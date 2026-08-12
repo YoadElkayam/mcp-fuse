@@ -42,7 +42,9 @@ Versions follow semver; `mcp-fuse` and `mcp-fuse-core` release together.
 1. Bump `version` in `packages/core/package.json` and `packages/proxy/package.json`.
 2. Commit, then tag: `git tag v0.x.y && git push --tags`.
 3. The `Release` workflow builds, tests, and publishes both packages to npm with
-   provenance. It needs an `NPM_TOKEN` repository secret (npm automation token).
+   provenance via npm Trusted Publishing (OIDC) — no tokens involved. The trusted
+   publisher for each package is configured on npmjs.com to this repo's
+   `release.yml`.
 
 Manual fallback: `npm login`, then `pnpm -r publish --access public` from a clean
 checkout.

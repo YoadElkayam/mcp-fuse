@@ -6,13 +6,12 @@ on:
 
 permissions:
   contents: read
-  id-token: write # npm provenance
+  id-token: write # npm trusted publishing (OIDC) + provenance
 
 jobs:
   publish:
     runs-on: ubuntu-latest
-    env:
-      NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+    if: github.repository == 'YoadElkayam/mcp-fuse'
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -21,14 +20,25 @@ jobs:
           node-version: 22
           cache: pnpm
           registry-url: https://registry.npmjs.org
+      # OIDC trusted publishing requires a recent npm CLI
+      - run: npm install -g npm@latest
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
       - run: pnpm test
-      - name: Publish to npm
-        if: env.NPM_TOKEN != ''
-        run: pnpm -r publish --access public --no-git-checks
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-      - name: Skipped publish notice
-        if: env.NPM_TOKEN == ''
-        run: echo "NPM_TOKEN secret not set — build/test ran, npm publish skipped (publish manually or add the secret)"
+      # npm (unlike pnpm) doesn't rewrite workspace:* on publish; pin it to the real version
+      - name: Resolve workspace dependency version
+        run: |
+          node -e '
+            const fs = require("fs");
+            const core = JSON.parse(fs.readFileSync("packages/core/package.json", "utf8"));
+            const proxyPath = "packages/proxy/package.json";
+            const proxy = JSON.parse(fs.readFileSync(proxyPath, "utf8"));
+            proxy.dependencies["mcp-fuse-core"] = "^" + core.version;
+            fs.writeFileSync(proxyPath, JSON.stringify(proxy, null, 2) + "\n");
+          '
+      - name: Publish mcp-fuse-core
+        working-directory: packages/core
+        run: npm publish --provenance --access public
+      - name: Publish mcp-fuse
+        working-directory: packages/proxy
+        run: npm publish --provenance --access public
