@@ -1,6 +1,6 @@
 {
   "name": "mcp-fuse-core",
-  "version": "0.1.0",
+  "version": "0.1.2",
   "description": "MCP Error Policy (MEP) types, classifier, retry engine, and circuit breaker — the engine behind mcp-fuse",
   "license": "MIT",
   "repository": {
