@@ -38,11 +38,11 @@ Two pieces, shipped together:
    to change course. No SDK changes, no server changes, no orchestration harness.
 
 ```
-┌────────┐     ┌──────────────────────────────┐     ┌────────────┐
+┌──────────┐     ┌──────────────────────────────┐     ┌────────────┐
 │ Agent /  │────▶│          mcp-fuse            │────▶│ MCP server │
 │ MCP host │     │ classify → retry → breaker   │     │ (any)      │
 │          │◀────│ → 1 semantic message, max    │◀────│            │
-└────────┘     └──────────────────────────────┘     └────────────┘
+└──────────┘     └──────────────────────────────┘     └────────────┘
 ```
 
 ## Quickstart
