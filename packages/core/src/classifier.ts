@@ -16,7 +16,7 @@ const MESSAGE_RULES: MessageRule[] = [
   { pattern: /rate.?limit|too many requests|429/i, category: "rate_limit" },
   { pattern: /quota exceeded|billing|payment required/i, category: "resource_exhausted" },
   { pattern: /timed?.?out|deadline exceeded|ETIMEDOUT|ESOCKETTIMEDOUT/i, category: "timeout" },
-  { pattern: /ECONNREFUSED|ECONNRESET|EPIPE|EAI_AGAIN|socket hang up|service unavailable/i, category: "transient" },
+  { pattern: /ECONNREFUSED|ECONNRESET|EPIPE|EAI_AGAIN|socket hang up|service unavailable|fetch failed/i, category: "transient" },
   { pattern: /unauthorized|unauthenticated|invalid.{0,10}(token|api.?key)|expired.{0,10}(token|credential)/i, category: "auth" },
   { pattern: /forbidden|permission denied|access denied/i, category: "permission" },
   { pattern: /not found|no such (file|tool|method|resource)/i, category: "not_found" },

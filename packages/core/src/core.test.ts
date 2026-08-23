@@ -26,6 +26,12 @@ test("classify: ECONNREFUSED message → transient", () => {
   assert.equal(policy.retryable, true);
 });
 
+test("classify: Node fetch failed message → transient", () => {
+  const policy = classify({ message: "TypeError: fetch failed" });
+  assert.equal(policy.category, "transient");
+  assert.equal(policy.retryable, true);
+});
+
 test("classify: leading HTTP status line beats keywords buried in the trace", () => {
   const policy = classify({
     message:
