@@ -108,10 +108,11 @@ Field semantics:
   before" bound. Clients MUST NOT retry earlier. Clients whose own deadline falls
   before it SHOULD fail fast and remember the bound rather than block.
 - `circuit`: advisory breaker state for this tool or server.
-- `reconcile`: TODO(aurumflux20): a pointer to the read that answers "did this
-  land?" for an ambiguous outcome. Present in the payload only to say "this call is
-  in the ambiguous state, run this"; the static declaration of which read applies
-  belongs on the tool (see 4.3).
+- `reconcile`: a bare pointer to the read that answers "did this land?" for an
+  ambiguous outcome. It says only "this call is in the ambiguous state, run this."
+  Which read applies is declared statically on the tool, and how to interpret the
+  answer (the four-valued verdict space, and why "could not determine" is terminal
+  for automatic handling) is specified in 4.3.
 - `agentGuidance`: the ONLY text intended for the model. At most 500 characters,
   imperative, never a stack trace.
 - `detail`: diagnostics for logs and humans. Clients SHOULD NOT forward it to the
@@ -127,15 +128,23 @@ Field semantics:
 | Tool result with `isError: true` | `result._meta["io.modelcontextprotocol/error-policy"]` |
 | HTTP transport error (opaque body) | `MCP-Error-Policy` response header, base64url JSON |
 
-Open question: multiple SDKs have been observed dropping `_meta` in transit (raised
-in SEP-3182 review). The proposal needs either a normative preservation requirement
-for `_meta` on tool results or a dedicated field. TODO(all): decide.
+`_meta` preservation: multiple SDKs have been observed dropping `_meta` in transit
+(raised in SEP-3182 review). Authors' position: a normative preservation requirement
+(intermediaries and SDKs MUST pass unknown `_meta` keys through unchanged) rather
+than a dedicated field, which would only move the problem. Flagged for the sponsor:
+this requirement lands on SDK maintainers, not just on consumers of this SEP, so it
+needs their visibility early. Until it is settled, the `error.data` carrier for
+JSON-RPC errors is the reliable path.
 
 ### 4.3 Effect declaration and the replay gate
 
 TODO(aurumflux20): tri-state effect class on the tool declaration replacing the
 boolean reading of `idempotentHint`: safe to replay / unsafe but reversible /
-unsafe and irreversible. Plus the static reconciliation pointer.
+unsafe and irreversible. Plus the static reconciliation pointer and its verdict
+space: a reconciliation read yields exactly one of {effect found once, effect
+authoritatively absent, effect found more than once, could not determine}, and
+"could not determine" (the read itself failed or timed out) is terminal for
+automatic handling: it MUST NOT be collapsed into "absent".
 
 Normative behavior (all authors agree on this core):
 
