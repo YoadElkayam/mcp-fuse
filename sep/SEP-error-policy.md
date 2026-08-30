@@ -152,9 +152,14 @@ Normative behavior (all authors agree on this core):
   (timeout, mid-stream reset, opaque 5xx) against a tool that is not declared safe to
   replay. It SHOULD surface `agentGuidance` and, if a reconciliation pointer exists,
   run it before any retry.
-- A client MAY replay failures that guarantee the request was never processed
-  (connection refused, reset before any response bytes, HTTP 429, HTTP 503) subject
-  to `retry.afterMs`.
+- A client MAY replay a request that provably never left the client (transport
+  failure before send) subject to `retry.afterMs`. Nothing in a received response
+  proves non-execution: 429 and 503 can arrive after the effect landed, and text
+  describing a connection reset describes the server's upstream, not its side
+  effect. Against a tool not declared safe to replay, a received response MUST NOT
+  trigger automatic replay. (The conformance battery in `sep/conformance` caught
+  two text-based versions of this rule replaying a side-effecting tool; the
+  structural rule is the fix.)
 - Tools declared read-only or idempotent MAY be replayed per the retry directive.
 
 ### 4.4 Minimal-consumer rule

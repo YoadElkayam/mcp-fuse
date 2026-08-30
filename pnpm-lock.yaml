@@ -37,6 +37,25 @@ importers:
         specifier: ^5.7.0
         version: 5.9.3
 
+  examples/hostile-server:
+    dependencies:
+      '@modelcontextprotocol/sdk':
+        specifier: ^1.15.0
+        version: 1.30.0(zod@3.25.76)
+      mcp-fuse:
+        specifier: workspace:*
+        version: link:../../packages/proxy
+      zod:
+        specifier: ^3.24.0
+        version: 3.25.76
+    devDependencies:
+      '@types/node':
+        specifier: ^22.10.0
+        version: 22.20.1
+      typescript:
+        specifier: ^5.7.0
+        version: 5.9.3
+
   packages/core:
     devDependencies:
       '@types/node':

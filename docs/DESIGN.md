@@ -111,7 +111,7 @@ proxy) MUST gate retry behavior on them:
 | Tool annotation | Silent retry policy |
 |-----------------|---------------------|
 | `readOnlyHint` or `idempotentHint` true | Full silent retry per `retry` directive |
-| Neither (or absent) | Retry ONLY failures that guarantee the request was never processed: connection refused, reset-before-response, HTTP 429, HTTP 503. Ambiguous failures (timeouts, mid-stream resets, opaque 5xx) fail fast with guidance — never replayed. |
+| Neither (or absent) | Retry ONLY when the request provably never left the client (transport down before send). Any received response, whatever its text, may mean the effect landed; fail fast with guidance — never replayed. |
 
 This is a spec-level rule, not a proxy implementation detail: double-executing a
 state-mutating tool (`send_email`, `create_order`) is the failure mode that keeps

@@ -91,8 +91,12 @@ test("idempotency gate: ambiguous failures never replay against non-idempotent t
   assert.equal(silentRetryAllowed(timeout, true), true);
   assert.equal(silentRetryAllowed(timeout, false), false);
 
-  const rateLimit: ErrorPolicy = { version: "1", category: "rate_limit", retryable: true };
-  assert.equal(silentRetryAllowed(rateLimit, false), true);
+  const rateLimit: ErrorPolicy = { version: "1", category: "rate_limit", retryable: true, detail: "HTTP 429" };
+  assert.equal(silentRetryAllowed(rateLimit, true), true);
+  assert.equal(silentRetryAllowed(rateLimit, false), false, "a 429 is a server response; it may have executed");
+
+  const unavailable: ErrorPolicy = { version: "1", category: "transient", retryable: true, detail: "HTTP 503 Service Unavailable" };
+  assert.equal(silentRetryAllowed(unavailable, false), false, "503 after the effect landed is a real failure mode");
 
   const connRefused: ErrorPolicy = {
     version: "1",
@@ -100,7 +104,9 @@ test("idempotency gate: ambiguous failures never replay against non-idempotent t
     retryable: true,
     detail: "connect ECONNREFUSED 10.0.0.17:8443",
   };
-  assert.equal(silentRetryAllowed(connRefused, false), true);
+  assert.equal(silentRetryAllowed(connRefused, false), false, "text describing a reset proves nothing");
+  assert.equal(silentRetryAllowed(connRefused, false, { requestDelivered: false }), true, "never delivered: safe");
+  assert.equal(silentRetryAllowed(connRefused, false, { requestDelivered: true }), false);
 
   const opaque500: ErrorPolicy = {
     version: "1",

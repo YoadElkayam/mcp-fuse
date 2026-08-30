@@ -73,6 +73,8 @@ interface Failure {
   rawText: string;
   /** Set when the failure was a thrown JSON-RPC error rather than an isError result. */
   thrownCode?: number;
+  /** false only when the request provably never reached the child (pre-send). */
+  requestDelivered: boolean;
 }
 
 export class StdioProxy {
@@ -274,7 +276,7 @@ export class StdioProxy {
           return result;
         }
         const rawText = extractText(result.content);
-        failure = { policy: classify({ message: rawText, isToolResult: true }), rawText };
+        failure = { policy: classify({ message: rawText, isToolResult: true }), rawText, requestDelivered: true };
       } catch (e) {
         lastAttemptMs = Date.now() - t0;
         if (!this.childAlive && !this.shuttingDown) {
@@ -286,11 +288,23 @@ export class StdioProxy {
         }
         const code = e instanceof McpError ? e.code : undefined;
         const rawText = e instanceof Error ? e.message : String(e);
-        failure = { policy: classify({ jsonrpcCode: code, message: rawText }), rawText, thrownCode: code };
+        // -32001 (timeout) and -32000 (connection closed) are the proxy's own
+        // transport failures, not errors the child returned; surface those as a
+        // semantic tool result rather than re-throwing a protocol error.
+        const childProtocolError = code !== undefined && code !== -32001 && code !== -32000;
+        // The SDK throws "Not connected" synchronously when the transport is down
+        // before the request is written: the only case where we KNOW it never left.
+        const requestDelivered = !/not connected/i.test(rawText);
+        failure = {
+          policy: classify({ jsonrpcCode: code, message: rawText }),
+          rawText,
+          thrownCode: childProtocolError ? code : undefined,
+          requestDelivered,
+        };
       }
 
       const idempotent = this.isIdempotent(name);
-      if (!silentRetryAllowed(failure.policy, idempotent)) {
+      if (!silentRetryAllowed(failure.policy, idempotent, { requestDelivered: failure.requestDelivered })) {
         if (failure.policy.retryable && !idempotent) {
           failure.policy = {
             ...failure.policy,

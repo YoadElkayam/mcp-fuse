@@ -3,29 +3,34 @@ import type { ErrorPolicy } from "./types.js";
 /**
  * The idempotency gate (spec/README.md "Idempotency gate", DESIGN §3.3).
  *
- * Failure classes that guarantee the upstream request was never processed —
- * the only ones safe to replay against a tool with side effects.
+ * For a tool not declared safe to replay, the only proof that the request was
+ * not processed is STRUCTURAL: the request was never delivered (the transport
+ * was not connected when we tried to send). Nothing in the text of a response
+ * can prove non-execution: a 503 or a 429 can be returned after the effect
+ * landed, and a body that says "connection reset" describes the server's own
+ * upstream, not whether its side effect happened. The SEP conformance battery
+ * (sep/conformance) caught two earlier text-based versions of this rule
+ * replaying a side-effecting tool; this version is the fix.
  */
-const NOT_PROCESSED_PATTERN =
-  /ECONNREFUSED|ECONNRESET|EPIPE|connection refused|reset before|HTTP\/?[\d.]*\s+(?:429|503)|too many requests|service unavailable/i;
+export interface GateContext {
+  /** false only when the caller KNOWS the request never left (pre-send failure). */
+  requestDelivered?: boolean;
+}
 
 /**
  * Whether a failed tools/call may be silently replayed, given the tool's
  * declared idempotency (readOnlyHint/idempotentHint from tools/list, or an
- * explicit operator override).
+ * explicit operator override) and what is known about delivery.
  */
 export function silentRetryAllowed(
   policy: ErrorPolicy,
   toolIsIdempotent: boolean,
+  context: GateContext = {},
 ): boolean {
   if (!policy.retryable) return false;
   if (toolIsIdempotent) return true;
-  if (policy.category === "rate_limit") return true;
-  if (policy.category === "transient") {
-    return NOT_PROCESSED_PATTERN.test(policy.detail ?? "");
-  }
-  // timeout / unknown: the request may have been processed — never replay.
-  return false;
+  // Side-effecting tool: replay only if the request provably never went out.
+  return context.requestDelivered === false;
 }
 
 /** Guidance emitted when the gate blocks a retry the policy would otherwise allow. */

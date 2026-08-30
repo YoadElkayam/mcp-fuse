@@ -1,6 +1,6 @@
 {
   "name": "mcp-fuse",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "description": "Zero-config MCP resilience proxy: wrap any MCP server, stop token-burning error loops",
   "license": "MIT",
   "repository": {

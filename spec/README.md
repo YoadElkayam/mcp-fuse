@@ -57,11 +57,12 @@ declared annotations from `tools/list`:
 
 - Tools with `annotations.readOnlyHint` or `annotations.idempotentHint` set to
   `true` MAY be silently retried per the `retry` directive.
-- All other tools MUST only be silently retried on failures that guarantee the
-  request was never processed (connection refused, connection reset before any
-  response bytes, HTTP 429, HTTP 503). Ambiguous failures — timeouts, mid-stream
-  resets, opaque 5xx — MUST NOT be replayed automatically; consumers fail fast and
-  surface `agentGuidance` instead.
+- All other tools MUST only be silently retried when the request provably never
+  left the client (a transport failure before the request was sent). Nothing in the
+  text of a response proves non-execution: a 429 or 503 can arrive after the effect
+  landed, and a body describing a connection reset describes the server's own
+  upstream. Consumers fail fast, surface `agentGuidance`, and use the reconciliation
+  read where one is declared.
 
 A resilience layer must never be the component that double-executes a
 state-mutating tool.
