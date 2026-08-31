@@ -54,9 +54,13 @@ inferred, so it has to be declared.
 
 **A static scan of the published ecosystem.** [fencescan][fs] read 755 MCP servers
 from the npm registry; 671 scanned successfully (84 were unreachable or unpublishable),
-covering 27,153 declared tools. Of the 671, 470 expose at least one effectful
-(write-capable) tool. **150 of those 470 — 32% — show no visible idempotency guard
-of any kind**: no idempotency key, no dedup lookup, no conditional write. Separately,
+covering 27,153 declared tools. Of the 671, **539 perform real writes, and 175 of those
+— 32% — show no visible idempotency guard of any kind**: no idempotency key, no dedup
+lookup, no conditional write. (Counted the stricter way — servers exposing an
+effectful *tool* rather than any write — it is 150 of 470, the same 32%.) Narrowing to
+the sharpest cut, 32 servers both write and carry retry logic with no guard the scanner
+could see; among the 23 largest servers scanned (10,000+ downloads/month), 6 write with
+no visible guard. Separately,
 where an `idempotentHint` annotation *is* present, nothing in the protocol requires
 the server to consult it at execution time, so its truth is not enforced by anything.
 
