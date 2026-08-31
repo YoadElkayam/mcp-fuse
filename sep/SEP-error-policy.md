@@ -249,7 +249,12 @@ restricts automatic retries clients were never guaranteed to be safe making.
   opening, and payload attachment.
 - **fencescan** (Apache-2.0): declaration-side scanner and the scan dataset behind
   section 3.3.
-- TODO(all): a conformance test as required for Standards Track SEPs.
+- **Conformance battery** ([`sep/conformance`](conformance/README.md)): seven
+  failure modes with direction-aware scoring (over-firing AND over-refusing), a
+  fixture whose side effect is recorded before the failure fires, and a self-check
+  history: it caught the reference implementation double-executing twice before the
+  structural replay gate landed. Starting point for the SEP's required conformance
+  test.
 
 ## 8. Security Implications
 
