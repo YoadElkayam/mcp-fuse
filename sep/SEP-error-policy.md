@@ -49,11 +49,37 @@ client-side symptoms in opencode, vercel/ai, and awslabs/mcp.
 
 ### 3.3 Evidence that inference cannot replace declaration
 
-TODO(aurumflux20): fencescan scan of 671 published servers (27,153 declared tools):
-32% of write-capable servers show no visible idempotency guard; annotations that
-exist are sometimes not consulted at runtime. agent-money-test: careful static
-inference of retry safety still produced roughly one false positive in three when
-hand-verified. Link datasets and the false-positive writeup.
+Two independent measurements say the same thing: retry safety cannot be reliably
+inferred, so it has to be declared.
+
+**A static scan of the published ecosystem.** [fencescan][fs] read 755 MCP servers
+from the npm registry; 671 scanned successfully (84 were unreachable or unpublishable),
+covering 27,153 declared tools. Of the 671, **539 perform real writes, and 175 of those
+— 32% — show no visible idempotency guard of any kind**: no idempotency key, no dedup
+lookup, no conditional write. (Counted the stricter way — servers exposing an
+effectful *tool* rather than any write — it is 150 of 470, the same 32%.) Narrowing to
+the sharpest cut, 32 servers both write and carry retry logic with no guard the scanner
+could see; among the 23 largest servers scanned (10,000+ downloads/month), 6 write with
+no visible guard. Separately,
+where an `idempotentHint` annotation *is* present, nothing in the protocol requires
+the server to consult it at execution time, so its truth is not enforced by anything.
+
+**A dynamic check that inference is not enough.** [agent-money-test][amt] infers
+retry-safety from a server's own source — does a retry path wrap an effectful call
+with no idempotency identity in scope. Hand-verified against real repositories, its
+careful static inference still produced roughly one false positive in three: guards
+that live in a service the repository calls rather than in the file being read, and
+identity fields the scanner's patterns could not see. The tool's own history is the
+argument — an early version accused a repository of having zero guards while it
+shipped an entire `deriveIdempotencyKey` module, because a regular expression without
+a word boundary could not match the name.
+
+Inference (static or runtime) and observation both bottom out at the same limit: the
+only party that reliably knows whether a tool is safe to replay is the tool. A spec
+that lets it say so is strictly more reliable than any consumer guessing.
+
+[fs]: https://github.com/aurumflux20/fencescan
+[amt]: https://github.com/aurumflux20/agent-money-test
 
 ### 3.4 Cost to the model
 
@@ -138,13 +164,37 @@ JSON-RPC errors is the reliable path.
 
 ### 4.3 Effect declaration and the replay gate
 
-TODO(aurumflux20): tri-state effect class on the tool declaration replacing the
-boolean reading of `idempotentHint`: safe to replay / unsafe but reversible /
-unsafe and irreversible. Plus the static reconciliation pointer and its verdict
-space: a reconciliation read yields exactly one of {effect found once, effect
-authoritatively absent, effect found more than once, could not determine}, and
-"could not determine" (the read itself failed or timed out) is terminal for
-automatic handling: it MUST NOT be collapsed into "absent".
+A tool declares its **effect class**, a three-state field that replaces the boolean
+reading of `idempotentHint`:
+
+- `safe-to-replay` — the call carries no external side effect, or the server
+  deduplicates it internally; a client may replay it freely subject to `retry.afterMs`.
+- `unsafe-reversible` — a replay may produce a second effect, but that effect can be
+  undone (a charge that can be refunded, a record that can be deleted).
+- `unsafe-irreversible` — a replay may produce a second effect that cannot be undone
+  (a settled on-chain payment, an email sent).
+
+The boolean `idempotentHint` cannot express this: a client acting on it treats a
+refundable double-charge and an irreversible double-send identically, which forces it
+to be either over-cautious about the first or under-informative about the second. The
+effect class lets a client escalate its caution to match the cost.
+
+A tool that is not `safe-to-replay` MAY also carry a **reconciliation pointer**: the
+name of a read-only tool that answers "did this effect happen?" for a given call. When
+an ambiguous failure occurs, a client runs the pointer before deciding, and the read
+yields exactly one of four verdicts:
+
+- **effect found once** — settle the call as done; do not replay.
+- **effect authoritatively absent** — the effect provably did not happen; replay is
+  now safe.
+- **effect found more than once** — a prior replay already double-fired; this is a
+  divergence to surface, not to retry.
+- **could not determine** — the reconciliation read itself failed, timed out, or the
+  provider cannot answer. **This verdict is terminal for automatic handling and MUST
+  NOT be collapsed into "absent".** The failure the pointer exists to resolve is
+  simply not resolved; a client that reads "could not determine" as "did not happen"
+  reintroduces the exact double-fire the pointer was there to prevent. The correct
+  behavior is to stop and surface, never to replay.
 
 Normative behavior (all authors agree on this core):
 
