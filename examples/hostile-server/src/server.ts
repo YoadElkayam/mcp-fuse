@@ -15,7 +15,7 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { setTimeout as sleep } from "node:timers/promises";
 import { z } from "zod";
 
-export const MODES = ["settle-then-timeout", "5xx-after-settle", "duplicate", "slow-answer", "honest"] as const;
+export const MODES = ["settle-then-timeout", "5xx-after-settle", "duplicate", "slow-answer", "verify-unavailable", "declared-safe", "honest"] as const;
 type Mode = (typeof MODES)[number];
 
 const mode = (process.argv[2] ?? "honest") as Mode;
@@ -56,13 +56,50 @@ server.registerTool(
           isError: true,
           content: [{ type: "text", text: "HTTP 429 Too Many Requests\nretry-after: 1" }],
         };
+      case "verify-unavailable":
+        // Effect landed, response ambiguous, AND the reconciliation read will fail too.
+        return {
+          isError: true,
+          content: [{ type: "text", text: "ETIMEDOUT: upstream timed out after 30000ms; state unknown" }],
+        };
       case "slow-answer":
         await sleep(8_000); // succeeds, but slower than most client deadlines
         return { content: [{ type: "text", text: `charged ${amount} for ${orderId}` }] };
+      case "declared-safe":
       case "honest":
         return { content: [{ type: "text", text: `charged ${amount} for ${orderId}` }] };
     }
   },
+);
+
+let safeAttempts = 0;
+server.registerTool(
+  "charge_safe",
+  {
+    description: "Charge with server-side dedup by orderId. Declared safe to replay; replays are expected.",
+    inputSchema: { orderId: z.string(), amount: z.number() },
+    annotations: { readOnlyHint: false, idempotentHint: true },
+  },
+  async ({ orderId, amount }) => {
+    safeAttempts += 1;
+    if (!executions.has(orderId)) executions.set(orderId, 1); // dedup: effect at most once
+    console.error(`[hostile:${mode}] charge_safe attempt ${safeAttempts} for ${orderId}`);
+    if (safeAttempts === 1) {
+      // First attempt fails transiently; a correct client replays because the tool declares safety.
+      return { isError: true, content: [{ type: "text", text: "HTTP 503 Service Unavailable" }] };
+    }
+    return { content: [{ type: "text", text: `charged ${amount} for ${orderId} (attempt ${safeAttempts})` }] };
+  },
+);
+
+server.registerTool(
+  "charge_attempts_safe",
+  {
+    description: "How many times charge_safe was invoked (attempts, not effects).",
+    inputSchema: {},
+    annotations: { readOnlyHint: true, idempotentHint: true },
+  },
+  async () => ({ content: [{ type: "text", text: String(safeAttempts) }] }),
 );
 
 server.registerTool(
@@ -72,8 +109,26 @@ server.registerTool(
     inputSchema: { orderId: z.string() },
     annotations: { readOnlyHint: true, idempotentHint: true },
   },
+  async ({ orderId }) => {
+    if (mode === "verify-unavailable") {
+      // The recursive case: the read that answers "did this land?" is itself down.
+      return { isError: true, content: [{ type: "text", text: "HTTP 503 Service Unavailable: ledger shard offline" }] };
+    }
+    return {
+      content: [{ type: "text", text: JSON.stringify({ orderId, executions: executions.get(orderId) ?? 0 }) }],
+    };
+  },
+);
+
+server.registerTool(
+  "ground_truth",
+  {
+    description: "Test-harness backdoor: true execution count regardless of mode.",
+    inputSchema: { orderId: z.string() },
+    annotations: { readOnlyHint: true, idempotentHint: true },
+  },
   async ({ orderId }) => ({
-    content: [{ type: "text", text: JSON.stringify({ orderId, executions: executions.get(orderId) ?? 0 }) }],
+    content: [{ type: "text", text: String(executions.get(orderId) ?? 0) }],
   }),
 );
 
