@@ -212,7 +212,34 @@ Normative behavior (all authors agree on this core):
   structural rule is the fix.)
 - Tools declared read-only or idempotent MAY be replayed per the retry directive.
 
-### 4.4 Minimal-consumer rule
+### 4.4 Caller-supplied identifiers ("the description is the interface")
+
+A field reading of eight agent-payment toolkits ([aurumflux20 in #2930][csi]) found a
+defect class this SEP must name: in three toolkits the idempotency mechanism was
+implemented correctly and the parameter description defeated it. A description
+saying the key must be "unique for every request" is accurate prose for a human
+integrator, for whom "request" means the purchase. A model caller re-reads that
+text on every call, with no memory of the last one, and executes it literally: it
+mints a fresh key on retry, and the platform correctly records a second payment.
+In MCP, a tool description is not documentation; it is the specification the
+caller executes.
+
+Normative (wording after HarperZ9 in the same thread):
+
+- If a tool accepts a caller-supplied idempotency key, the tool contract or the key
+  parameter's description MUST require the same value for every attempt of the same
+  logical operation, and a different value for each distinct logical operation.
+- The caller, host, or client MUST retain that value until the outcome is
+  reconciled, and MUST NOT generate a replacement merely because an attempt timed
+  out or failed ambiguously.
+
+This rule lives in the tool contract rather than the error payload deliberately: by
+the time an ambiguous result is being handled under 4.3, a rotated key has already
+destroyed the identity that reconciliation depends on.
+
+[csi]: https://github.com/modelcontextprotocol/modelcontextprotocol/discussions/2930
+
+### 4.5 Minimal-consumer rule
 
 A consumer that understands only `category` and `retryable` MUST still behave
 correctly. All other fields refine behavior; none change its direction.

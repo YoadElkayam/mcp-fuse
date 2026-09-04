@@ -47,6 +47,12 @@ demonstrated twice on our own code.
 
 ## Open items
 
+- Key stability (SEP 4.4): apply the effect, drop the response, retry; assert one
+  effect and the SAME idempotency key across attempts (a client that rotates the
+  key on ambiguous failure must fail this mode).
+- Key distinctness (SEP 4.4): perform a second, distinct logical operation; assert
+  a DIFFERENT key, so a client cannot pass by reusing one process-wide value.
+
 - Run the battery against hosts directly (Claude Code, Cursor) once a policy-aware
   client exists outside the proxy.
 - Decide whether `verify-unavailable` should also assert *what the client surfaced*
