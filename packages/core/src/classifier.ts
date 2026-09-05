@@ -41,6 +41,13 @@ function categorizeJsonRpc(code: number): ErrorCategory {
       return "invalid_input";
     case -32601: // method not found
       return "not_found";
+    case -32000: // SDK ConnectionClosed — connection-level, retryable with backoff.
+      // Found by the retry-original-key conformance mode: as "unknown" this
+      // capped at one attempt, so a declared-idempotent tool was never replayed
+      // after a dropped response.
+      return "transient";
+    case -32001: // SDK RequestTimeout
+      return "timeout";
     case -32603: // internal error — opaque; treat as unknown (one retry)
     default:
       return "unknown";

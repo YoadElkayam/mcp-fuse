@@ -76,6 +76,14 @@ request provably never left the client. The rerun passes 5 of 5. The sequence is
 recorded here on purpose: it is the SEP's argument for declaration over inference,
 demonstrated twice on our own code.
 
+**Second finding, 2026-09-06** (PR #9, HarperZ9): `retry-original-key` caught the
+reference implementation failing to replay a DECLARED-idempotent tool after a true
+dropped response. The child's exit surfaces as the SDK's `-32000 Connection closed`,
+which the classifier filed under `unknown`; unknown caps at one attempt, so the
+replay the gate explicitly permits never ran. Fix: `-32000`/`-32001` now classify as
+`transient`/`timeout`. 9/9 after the fix. Same lesson as the first finding, from the
+other direction: the battery polices over-refusing, not just over-firing.
+
 ## Open items
 
 - Resolve the reference proxy's real dropped-response retry failure while

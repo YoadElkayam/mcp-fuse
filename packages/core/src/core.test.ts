@@ -46,6 +46,14 @@ test("classify: rate_limit gets rate-limit-specific guidance", () => {
   assert.match(policy.agentGuidance!, /rate limited/);
 });
 
+test("classify: SDK transport codes — connection closed is transient, timeout is timeout", () => {
+  const closed = classify({ jsonrpcCode: -32000, message: "MCP error -32000: Connection closed" });
+  assert.equal(closed.category, "transient");
+  assert.ok((closed.retry?.maxAttempts ?? 0) >= 3, "transient must get a real retry budget, not unknown's single attempt");
+  const timedOut = classify({ jsonrpcCode: -32001, message: "MCP error -32001: Request timed out" });
+  assert.equal(timedOut.category, "timeout");
+});
+
 test("classify: JSON-RPC -32602 → invalid_input", () => {
   const policy = classify({ jsonrpcCode: -32602, message: "Invalid params" });
   assert.equal(policy.category, "invalid_input");
