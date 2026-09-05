@@ -8,14 +8,25 @@
  * tools/call in general instead of a payment facilitator.
  *
  * Usage: node dist/server.js <mode>
- * Modes: settle-then-timeout | 5xx-after-settle | duplicate | slow-answer | honest
  */
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import path from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 import { z } from "zod";
 
-export const MODES = ["settle-then-timeout", "5xx-after-settle", "duplicate", "slow-answer", "verify-unavailable", "declared-safe", "honest"] as const;
+export const MODES = [
+  "settle-then-timeout",
+  "5xx-after-settle",
+  "duplicate",
+  "slow-answer",
+  "verify-unavailable",
+  "retry-original-key",
+  "distinct-operation-key",
+  "declared-safe",
+  "honest",
+] as const;
 type Mode = (typeof MODES)[number];
 
 const mode = (process.argv[2] ?? "honest") as Mode;
@@ -24,10 +35,80 @@ if (!MODES.includes(mode)) {
   process.exit(2);
 }
 
+interface LedgerState {
+  executions: Record<string, number>;
+  keyedOrderIds: Record<string, string>;
+  keyedAttempts: Record<string, number>;
+  safeAttempts: number;
+}
+
+const statePathEnv = "HOSTILE_SERVER_STATE_PATH";
+const stateFile = process.env[statePathEnv];
+
+function emptyState(): LedgerState {
+  return {
+    executions: {},
+    keyedOrderIds: {},
+    keyedAttempts: {},
+    safeAttempts: 0,
+  };
+}
+
+function loadState(): LedgerState {
+  if (stateFile === undefined || !existsSync(stateFile)) return emptyState();
+
+  const parsed = JSON.parse(readFileSync(stateFile, "utf8")) as Partial<LedgerState>;
+  return {
+    executions: parsed.executions ?? {},
+    keyedOrderIds: parsed.keyedOrderIds ?? {},
+    keyedAttempts: parsed.keyedAttempts ?? {},
+    safeAttempts: parsed.safeAttempts ?? 0,
+  };
+}
+
+const initialState = loadState();
+
 /** Executions per logical request (order id). This is the ground truth. */
-const executions = new Map<string, number>();
+const executions = new Map<string, number>(Object.entries(initialState.executions));
+const keyedOrderIds = new Map<string, string>(Object.entries(initialState.keyedOrderIds));
+const keyedAttempts = new Map<string, number>(Object.entries(initialState.keyedAttempts));
+
+function persistState(): void {
+  if (stateFile === undefined) return;
+
+  mkdirSync(path.dirname(stateFile), { recursive: true });
+  writeFileSync(
+    stateFile,
+    `${JSON.stringify({
+      executions: Object.fromEntries(executions),
+      keyedOrderIds: Object.fromEntries(keyedOrderIds),
+      keyedAttempts: Object.fromEntries(keyedAttempts),
+      safeAttempts,
+    } satisfies LedgerState)}\n`,
+  );
+}
 
 const server = new McpServer({ name: "hostile-server", version: "0.0.1" });
+
+function recordKeyedCharge(orderId: string, idempotencyKey: string): {
+  attempts: number;
+  effectApplied: boolean;
+  originalOrderId: string;
+} {
+  const attempts = (keyedAttempts.get(idempotencyKey) ?? 0) + 1;
+  keyedAttempts.set(idempotencyKey, attempts);
+
+  const originalOrderId = keyedOrderIds.get(idempotencyKey);
+  if (originalOrderId !== undefined) {
+    persistState();
+    return { attempts, effectApplied: false, originalOrderId };
+  }
+
+  keyedOrderIds.set(idempotencyKey, orderId);
+  executions.set(orderId, (executions.get(orderId) ?? 0) + 1);
+  persistState();
+  return { attempts, effectApplied: true, originalOrderId: orderId };
+}
 
 server.registerTool(
   "charge",
@@ -39,6 +120,7 @@ server.registerTool(
   async ({ orderId, amount }) => {
     // The effect lands FIRST. Everything after this line is the trap.
     executions.set(orderId, (executions.get(orderId) ?? 0) + 1);
+    persistState();
     console.error(`[hostile:${mode}] charge executed for ${orderId} (count=${executions.get(orderId)})`);
 
     switch (mode) {
@@ -65,6 +147,8 @@ server.registerTool(
       case "slow-answer":
         await sleep(8_000); // succeeds, but slower than most client deadlines
         return { content: [{ type: "text", text: `charged ${amount} for ${orderId}` }] };
+      case "retry-original-key":
+      case "distinct-operation-key":
       case "declared-safe":
       case "honest":
         return { content: [{ type: "text", text: `charged ${amount} for ${orderId}` }] };
@@ -72,7 +156,7 @@ server.registerTool(
   },
 );
 
-let safeAttempts = 0;
+let safeAttempts = initialState.safeAttempts;
 server.registerTool(
   "charge_safe",
   {
@@ -83,6 +167,7 @@ server.registerTool(
   async ({ orderId, amount }) => {
     safeAttempts += 1;
     if (!executions.has(orderId)) executions.set(orderId, 1); // dedup: effect at most once
+    persistState();
     console.error(`[hostile:${mode}] charge_safe attempt ${safeAttempts} for ${orderId}`);
     if (safeAttempts === 1) {
       // First attempt fails transiently; a correct client replays because the tool declares safety.
@@ -103,6 +188,44 @@ server.registerTool(
 );
 
 server.registerTool(
+  "charge_with_key",
+  {
+    description: "Charge with a caller-supplied idempotency key. Replays with the same key dedupe; distinct operations need distinct keys.",
+    inputSchema: { orderId: z.string(), amount: z.number(), idempotencyKey: z.string() },
+    annotations: { readOnlyHint: false, idempotentHint: true },
+  },
+  async ({ orderId, amount, idempotencyKey }) => {
+    const keyed = recordKeyedCharge(orderId, idempotencyKey);
+    console.error(
+      `[hostile:${mode}] charge_with_key attempt ${keyed.attempts} for ${orderId} key=${idempotencyKey} (effect=${keyed.effectApplied ? "yes" : "dedup"})`,
+    );
+
+    if (mode === "retry-original-key" && keyed.attempts === 1) {
+      // The side effect has landed and the ledger has been persisted; close the
+      // child before any tool result is sent so the client observes response loss.
+      process.exit(0);
+    }
+
+    return {
+      content: [
+        {
+          type: "text",
+          text: JSON.stringify({
+            orderId,
+            amount,
+            idempotencyKey,
+            attempts: keyed.attempts,
+            effectApplied: keyed.effectApplied,
+            executions: executions.get(orderId) ?? 0,
+            originalOrderId: keyed.originalOrderId,
+          }),
+        },
+      ],
+    };
+  },
+);
+
+server.registerTool(
   "verify_charge",
   {
     description: "Reconciliation read: did a charge for this order land? Returns the execution count.",
@@ -118,6 +241,27 @@ server.registerTool(
       content: [{ type: "text", text: JSON.stringify({ orderId, executions: executions.get(orderId) ?? 0 }) }],
     };
   },
+);
+
+server.registerTool(
+  "ground_truth_key",
+  {
+    description: "Test-harness backdoor: true keyed-attempt state for one idempotency key.",
+    inputSchema: { idempotencyKey: z.string() },
+    annotations: { readOnlyHint: true, idempotentHint: true },
+  },
+  async ({ idempotencyKey }) => ({
+    content: [
+      {
+        type: "text",
+        text: JSON.stringify({
+          idempotencyKey,
+          attempts: keyedAttempts.get(idempotencyKey) ?? 0,
+          orderId: keyedOrderIds.get(idempotencyKey) ?? null,
+        }),
+      },
+    ],
+  }),
 );
 
 server.registerTool(
