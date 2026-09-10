@@ -18,6 +18,7 @@ const MESSAGE_RULES: MessageRule[] = [
   { pattern: /timed?.?out|deadline exceeded|ETIMEDOUT|ESOCKETTIMEDOUT/i, category: "timeout" },
   { pattern: /ECONNREFUSED|ECONNRESET|EPIPE|EAI_AGAIN|socket hang up|service unavailable|fetch failed/i, category: "transient" },
   { pattern: /unauthorized|unauthenticated|invalid.{0,10}(token|api.?key)|expired.{0,10}(token|credential)/i, category: "auth" },
+  { pattern: /blocked by polic|policy violation|denied by polic|requires approval/i, category: "policy_blocked" },
   { pattern: /forbidden|permission denied|access denied/i, category: "permission" },
   { pattern: /not found|no such (file|tool|method|resource)/i, category: "not_found" },
 ];
@@ -91,6 +92,8 @@ function defaultGuidance(category: ErrorCategory, retryable: boolean): string {
       return "The requested tool or resource does not exist. Do not retry with the same name.";
     case "resource_exhausted":
       return "A hard quota has been exhausted. Retrying will not help; inform the user.";
+    case "policy_blocked":
+      return "A policy rule blocked this action. Do not retry and do not re-authenticate; ask the user to approve it or contact their administrator.";
     default:
       return "This operation failed permanently. Do not retry; use an alternative approach or inform the user.";
   }

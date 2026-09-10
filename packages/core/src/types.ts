@@ -14,6 +14,7 @@ export type ErrorCategory =
   | "invalid_input"
   | "not_found"
   | "resource_exhausted"
+  | "policy_blocked"
   | "permanent"
   | "unknown";
 
@@ -73,6 +74,7 @@ export const DEFAULT_RETRYABLE: Record<ErrorCategory, boolean> = {
   invalid_input: false,
   not_found: false,
   resource_exhausted: false,
+  policy_blocked: false,
   permanent: false,
   unknown: true, // one cautious retry; see classifier
 };

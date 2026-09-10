@@ -29,6 +29,7 @@ Full payload: see [`examples/`](examples/).
 | `invalid_input` | Request malformed; retrying identical input is futile | no (agent may *change* input) |
 | `not_found` | Resource/method does not exist | no |
 | `resource_exhausted` | Hard quota (billing, storage) — not time-based | no |
+| `policy_blocked` | A policy layer refused the action (distinct from `permission`: re-auth cannot fix it) | no (escalate for approval) |
 | `permanent` | Known-unrecoverable server error | no |
 | `unknown` | Unclassified | one retry, then permanent |
 

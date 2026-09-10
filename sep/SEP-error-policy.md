@@ -91,8 +91,15 @@ mcp-fuse repository (`examples/flaky-server`).
 
 ### 3.5 Operator cost
 
-TODO(johnyzaguirre-glean): the support-ticket case for a correlation id; why
-timestamp matching fails on busy multi-tenant servers.
+The third consumer of a failure is the operator on support duty (after
+johnyzaguirre-glean, #2930). Without a correlation id, reconciling a user's "a tool
+call failed sometime around 10:04" against server logs means matching timestamps,
+which fails exactly when it matters most: on a busy multi-tenant server, ten
+requests share that second. One optional string turns the search from a time window
+into an exact grep. The model reads `agentGuidance` and the client switches on
+`category`; the correlation id is the field those two consumers never touch, and
+the reason it must be normative rather than conventional is that fields only
+operators use are the first ones dropped.
 
 ### 3.6 Prior art
 
@@ -125,10 +132,24 @@ general idempotency mechanism to a dedicated proposal.
 Field semantics:
 
 - `version` (required): consumers MUST ignore payloads with an unknown major version.
-- `category` (required): closed enum. TODO(johnyzaguirre-glean): final vocabulary
-  and the code-to-class mapping (capability / reliability / governance), including
-  the governance case (policy refused the action; escalate, do not retry, do not
-  re-auth).
+- `category` (required): closed enum, final vocabulary (after
+  johnyzaguirre-glean's #2930 and its thread): `transient`, `rate_limit`,
+  `timeout`, `auth`, `permission`, `invalid_input`, `not_found`,
+  `resource_exhausted`, `policy_blocked`, `permanent`, `unknown`. Categories are
+  the wire values; the contract clients rely on is the **class** each maps to
+  (grouping after HarperZ9):
+
+  | Class | Categories | Client behavior |
+  |-------|------------|-----------------|
+  | reliability | transient, rate_limit, timeout, unknown | retry per the directive, subject to the replay gate (4.3) |
+  | capability | auth, permission, invalid_input, not_found, resource_exhausted, permanent | stop; surface the required out-of-band action; retrying the identical call is pointless |
+  | governance | policy_blocked | a policy layer refused a well-formed action: escalate for human approval and audit; do not retry, do not re-auth |
+
+  `policy_blocked` is deliberately distinct from `permission`: permission is about
+  the caller's identity, governance is about the action itself being disallowed,
+  and the correct client responses differ, because re-authenticating cannot fix a
+  policy refusal. Granular server-defined codes stay free-form in `detail` for
+  operators; servers can add codes without breaking client logic.
 - `retryable`: whether the identical request can ever succeed. Defaults per category.
 - `retry.afterMs`: earliest time at which a retry may succeed. This is a "not
   before" bound. Clients MUST NOT retry earlier. Clients whose own deadline falls
@@ -143,8 +164,14 @@ Field semantics:
   imperative, never a stack trace.
 - `detail`: diagnostics for logs and humans. Clients SHOULD NOT forward it to the
   model.
-- `correlationId`: TODO(johnyzaguirre-glean): server-generated; servers SHOULD emit
-  it, intermediaries MUST pass it through unchanged.
+- `correlationId`: a server-generated opaque identifier for this specific failed
+  request (after johnyzaguirre-glean, #2930). Servers SHOULD generate one per
+  request; intermediaries MUST pass it through unchanged; clients SHOULD include it
+  when reporting a terminal failure to the user, so a person can paste it into a
+  support ticket and an operator can grep server logs for the exact request. It
+  exists for the operator, not for the model's reasoning. The strength is
+  deliberate: a field only operators use is precisely the field that never gets
+  adopted if it is merely suggested.
 
 ### 4.2 Carriers
 

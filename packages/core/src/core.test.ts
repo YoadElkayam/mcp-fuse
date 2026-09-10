@@ -54,6 +54,14 @@ test("classify: SDK transport codes — connection closed is transient, timeout 
   assert.equal(timedOut.category, "timeout");
 });
 
+test("classify: policy refusal → policy_blocked, terminal, distinct from permission", () => {
+  const policy = classify({ message: "Request denied: blocked by policy rule DLP-14 (requires approval)" });
+  assert.equal(policy.category, "policy_blocked");
+  assert.equal(policy.retryable, false);
+  assert.match(policy.agentGuidance!, /approve|administrator/);
+  assert.equal(silentRetryAllowed(policy, true), false, "policy refusals are never auto-retried");
+});
+
 test("classify: JSON-RPC -32602 → invalid_input", () => {
   const policy = classify({ jsonrpcCode: -32602, message: "Invalid params" });
   assert.equal(policy.category, "invalid_input");

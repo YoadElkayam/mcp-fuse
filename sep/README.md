@@ -29,6 +29,10 @@ welcome, and section owners below are starting points, not fences.
 | Operator fields (correlation id) | johnyzaguirre-glean | #2930 |
 | Docs-first guidance page (pre-SEP) | johnyzaguirre-glean | |
 
+Status note (2026-09-10): johnyzaguirre-glean's sections were drafted by the group
+under the graceful-exit offered in #2930, with his thread as the source and him
+credited as originator. His PRs reshaping them are welcome anytime.
+
 ## Process (per the SEP guidelines)
 
 - Find the relevant interest or working group before submitting; the Interceptors WG
