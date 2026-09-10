@@ -89,6 +89,13 @@ other direction: the battery polices over-refusing, not just over-firing.
 - Resolve the reference proxy's real dropped-response retry failure while
   preserving the original key. The fixture exists; this invariant is not yet
   satisfied by the reference proxy. Runtime/proxy changes are outside this PR.
+- Reconcile-endpoint misbehavior (soul-sol, #3188): drive the reconciliation read
+  through an oversized body (beyond pipe-buffer size), a soft-404 (HTTP 200 whose
+  content is "not available" prose), and a truncated response; assert each maps to
+  could-not-determine and holds — never to absent-then-replay. `verify-unavailable`
+  covers only the clean-failure half of this.
+- Positive controls for the reconcile checker itself: one case that must return
+  settled, one that must return not-settled.
 - Run the battery against hosts directly (Claude Code, Cursor) once a policy-aware
   client exists outside the proxy.
 - Decide whether `verify-unavailable` should also assert *what the client surfaced*

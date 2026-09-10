@@ -196,6 +196,24 @@ yields exactly one of four verdicts:
   reintroduces the exact double-fire the pointer was there to prevent. The correct
   behavior is to stop and surface, never to replay.
 
+One level below the verdict space, the client's own plumbing can defeat it. Real
+reconcile implementations have collapsed "read failed" into "not settled" through
+ordinary idioms: a pipeline that converts a partial read into a no-match, an error
+path that returns the same value as a genuine zero, a soft-404 that is HTTP 200
+with "not available" prose ([soul-sol in #3188][plumb], with dated reproductions).
+Two requirements follow:
+
+- A reconcile reader MUST represent read-failure distinctly from authoritative
+  absence all the way through its own code; a success-shaped response that does not
+  affirmatively answer the question MUST map to "could not determine", never to
+  "absent".
+- A reconcile checker MUST be validated against positive controls: one case that
+  must return settled and one that must return not-settled. A checker validated
+  only against the negative is indistinguishable from a function that returns a
+  constant.
+
+[plumb]: https://github.com/modelcontextprotocol/modelcontextprotocol/discussions/3188
+
 Normative behavior (all authors agree on this core):
 
 - A client MUST NOT automatically replay a `tools/call` whose failure is ambiguous
