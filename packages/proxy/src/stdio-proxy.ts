@@ -39,10 +39,13 @@ import {
   FuseMetrics,
   NON_IDEMPOTENT_GUIDANCE,
   classify,
+  interpretEffectCount,
   nextRetry,
   silentRetryAllowed,
   type CircuitBreakerOptions,
   type ErrorPolicy,
+  type ReconcileDeclaration,
+  type ReconcileVerdict,
 } from "mcp-fuse-core";
 
 const PassthroughSchema = z.object({}).passthrough();
@@ -50,6 +53,9 @@ const PassthroughSchema = z.object({}).passthrough();
 export interface ToolOverride {
   /** Treat this tool as idempotent even without annotations (operator knows best). */
   assumeIdempotent?: boolean;
+  /** Which read answers "did this land?" for this tool (SEP 4.3). Also readable
+   * from the tool's own _meta["dev.mcp-fuse/reconcile"]. */
+  reconcile?: ReconcileDeclaration;
 }
 
 export interface StdioProxyOptions {
@@ -75,6 +81,9 @@ interface Failure {
   thrownCode?: number;
   /** false only when the request provably never reached the child (pre-send). */
   requestDelivered: boolean;
+  /** The effect may have happened: a retryable-class failure on a delivered
+   * request against a tool the gate refuses to replay. Reconciliation territory. */
+  ambiguous?: boolean;
 }
 
 export class StdioProxy {
@@ -84,6 +93,8 @@ export class StdioProxy {
   private shuttingDown = false;
   private restartPromise: Promise<void> | undefined;
   private readonly toolIdempotency = new Map<string, boolean>();
+  private readonly toolReadOnly = new Map<string, boolean>();
+  private readonly toolMetaReconcile = new Map<string, ReconcileDeclaration>();
   private readonly breakers: CircuitBreakerRegistry;
   private readonly metrics = new FuseMetrics();
   private readonly absorbMs: number;
@@ -217,7 +228,16 @@ export class StdioProxy {
         tool.name,
         tool.annotations?.readOnlyHint === true || tool.annotations?.idempotentHint === true,
       );
+      this.toolReadOnly.set(tool.name, tool.annotations?.readOnlyHint === true);
+      const meta = (tool as { _meta?: Record<string, unknown> })._meta?.["dev.mcp-fuse/reconcile"];
+      if (meta && typeof meta === "object" && typeof (meta as ReconcileDeclaration).tool === "string") {
+        this.toolMetaReconcile.set(tool.name, meta as ReconcileDeclaration);
+      }
     }
+  }
+
+  private reconcileDeclFor(name: string): ReconcileDeclaration | undefined {
+    return this.options.tools?.[name]?.reconcile ?? this.toolMetaReconcile.get(name);
   }
 
   private isIdempotent(name: string): boolean {
@@ -306,6 +326,7 @@ export class StdioProxy {
       const idempotent = this.isIdempotent(name);
       if (!silentRetryAllowed(failure.policy, idempotent, { requestDelivered: failure.requestDelivered })) {
         if (failure.policy.retryable && !idempotent) {
+          failure.ambiguous = true;
           failure.policy = {
             ...failure.policy,
             retryable: false,
@@ -357,6 +378,57 @@ export class StdioProxy {
       await sleep(decision.delayMs);
     }
 
+    // Ambiguous outcome on a tool with a declared reconciliation read (SEP 4.3):
+    // ask whether the effect happened before deciding anything.
+    if (failure?.ambiguous) {
+      const decl = this.reconcileDeclFor(name);
+      if (decl) {
+        const outcome = await this.runReconcile(params, decl);
+        failure.policy = { ...failure.policy, reconcile: { tool: decl.tool, verdict: outcome.verdict } };
+        this.log({ event: "reconcile", tool: name, via: decl.tool, verdict: outcome.verdict });
+        if (outcome.verdict === "found_once") {
+          breaker.recordSuccess();
+          return {
+            content: [
+              {
+                type: "text",
+                text:
+                  `Verified: the operation already completed exactly once (checked via ${decl.tool} after the response was lost). ` +
+                  `Do not re-invoke it. The original output was lost; use a read tool if you need the resulting state.`,
+              },
+            ],
+            _meta: { [ERROR_POLICY_META_KEY]: failure.policy },
+          };
+        }
+        if (outcome.verdict === "authoritatively_absent") {
+          const replay = await this.replayOnce(params);
+          if (replay) {
+            breaker.recordSuccess();
+            return replay;
+          }
+          failure.policy = {
+            ...failure.policy,
+            agentGuidance:
+              `The operation verifiably did not take effect (checked via ${decl.tool}), but the replay also failed ambiguously. ` +
+              `Do not re-invoke; verify with ${decl.tool} before any further attempt.`,
+          };
+        } else if (outcome.verdict === "found_multiple") {
+          failure.policy = {
+            ...failure.policy,
+            agentGuidance:
+              `The operation appears to have executed MORE THAN ONCE (checked via ${decl.tool}). ` +
+              `Do not retry. Surface this to the user for manual review.`,
+          };
+        } else {
+          failure.policy = {
+            ...failure.policy,
+            agentGuidance:
+              `${NON_IDEMPOTENT_GUIDANCE} An automatic verification attempt via ${decl.tool} could not determine the outcome; treat it as unknown, never as "did not happen".`,
+          };
+        }
+      }
+    }
+
     // Terminal failure: one semantic message, raw payload suppressed.
     const stateBefore = breaker.state();
     const stateAfter = breaker.recordFailure();
@@ -390,6 +462,57 @@ export class StdioProxy {
       });
     }
     return this.semanticResult(policy);
+  }
+
+  /** Run the declared reconciliation read. Anything unclean is could_not_determine:
+   * a failed read is never evidence of absence. */
+  private async runReconcile(
+    params: { name: string; arguments?: Record<string, unknown>; [k: string]: unknown },
+    decl: ReconcileDeclaration,
+  ): Promise<{ verdict: ReconcileVerdict }> {
+    if (this.toolReadOnly.get(decl.tool) !== true) {
+      // SEP security rule: only reads declared read-only may be run automatically.
+      return { verdict: "could_not_determine" };
+    }
+    const args: Record<string, unknown> = {};
+    for (const [targetArg, sourceArg] of Object.entries(decl.args ?? {})) {
+      args[targetArg] = params.arguments?.[sourceArg];
+    }
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const res = (await (this.client as any).request(
+        { method: "tools/call", params: { name: decl.tool, arguments: args } },
+        CallToolResultSchema,
+        { timeout: 4000 },
+      )) as CallToolResult;
+      if (res.isError === true) return { verdict: "could_not_determine" };
+      const parsed: unknown = JSON.parse(extractText(res.content));
+      return { verdict: interpretEffectCount((parsed as Record<string, unknown>)?.[decl.countField]) };
+    } catch {
+      return { verdict: "could_not_determine" };
+    }
+  }
+
+  /** One replay after an authoritatively-absent verdict. Success returns the
+   * capped result; any failure returns undefined (the caller holds). */
+  private async replayOnce(params: {
+    name: string;
+    arguments?: Record<string, unknown>;
+    [k: string]: unknown;
+  }): Promise<CallToolResult | undefined> {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const result = (await (this.client as any).request(
+        { method: "tools/call", params },
+        CallToolResultSchema,
+        { timeout: 5000 },
+      )) as CallToolResult;
+      if (result.isError === true) return undefined;
+      this.metrics.recordAbsorbedRetry();
+      return result;
+    } catch {
+      return undefined;
+    }
   }
 
   private openCircuitPolicy(name: string, reopenInMs: number): ErrorPolicy {

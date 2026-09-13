@@ -121,9 +121,12 @@ bug in his own upstream battery (no reconcile route; untouched modes scored SAFE
 the reconciliation read must be served **raw** (a fixture returning pre-mapped
 verdicts tests itself), and a run that never attempts the read scores
 **`not_exercised`** — reported, never counted as a pass. Our own runner now applies
-this: mcp-fuse scores `not_exercised` on `verify-unavailable` because it holds
-without ever attempting reconciliation; implementing the reconcile read in the
-proxy is the roadmap item that turns that row green honestly.
+this. As of mcp-fuse 0.3.0 the proxy implements the reconciliation read (declared
+per tool via config or `_meta["dev.mcp-fuse/reconcile"]`, executed only against
+reads declared read-only, four-valued verdict, could-not-determine terminal), so
+`verify-unavailable` is exercised and the settled-but-response-lost modes resolve
+as verified-complete instead of dead-end errors. The `not_exercised` verdict
+remains in the runner as a regression guard.
 
 Both modes are implemented in the upstream battery
 ([hostile-facilitator](https://github.com/aurumflux20/hostile-facilitator), 7 modes,

@@ -48,7 +48,7 @@ test("mirrors the child's identity and tool list", async () => {
     assert.equal(client.getServerVersion()?.name, "fixture-server");
     const tools = await client.listTools();
     const names = tools.tools.map((t) => t.name).sort();
-    assert.deepEqual(names, ["always_503", "charge_attempts", "charge_card", "flaky_503"]);
+    assert.deepEqual(names, ["always_503", "charge_attempts", "charge_card", "charge_state", "flaky_503", "flaky_charge", "flaky_charge_state"]);
   } finally {
     await client.close();
   }
@@ -78,6 +78,72 @@ test("idempotency gate: ambiguous failure on a non-idempotent tool is NOT replay
 
     const count = await call(client, "charge_attempts");
     assert.equal(text(count), "1", "the charge must have executed exactly once");
+  } finally {
+    await client.close();
+  }
+});
+
+test("reconcile found_once: settled-but-response-lost resolves as verified, no replay", async () => {
+  const dir = mkdtempSync(path.join(tmpdir(), "mcp-fuse-test-"));
+  const configPath = path.join(dir, "fuse.config.json");
+  writeFileSync(
+    configPath,
+    JSON.stringify({
+      tools: { charge_card: { reconcile: { tool: "charge_state", countField: "executions" } } },
+    }),
+  );
+  const client = await connectThroughProxy(["--config", configPath]);
+  try {
+    const res = await call(client, "charge_card"); // executes, then fails ambiguously
+    assert.notEqual(res.isError, true, "verified-complete is not an error");
+    assert.match(text(res), /Verified: the operation already completed exactly once/);
+    assert.equal(mep(res)?.reconcile?.verdict, "found_once");
+    const count = await call(client, "charge_attempts");
+    assert.equal(text(count), "1", "no replay happened");
+  } finally {
+    await client.close();
+  }
+});
+
+test("reconcile authoritatively_absent: effect never landed, replay executes it exactly once", async () => {
+  const dir = mkdtempSync(path.join(tmpdir(), "mcp-fuse-test-"));
+  const configPath = path.join(dir, "fuse.config.json");
+  writeFileSync(
+    configPath,
+    JSON.stringify({
+      tools: { flaky_charge: { reconcile: { tool: "flaky_charge_state", countField: "executions" } } },
+    }),
+  );
+  const client = await connectThroughProxy(["--config", configPath]);
+  try {
+    const res = await call(client, "flaky_charge");
+    assert.notEqual(res.isError, true, "absent verdict allows the replay, which succeeds");
+    assert.match(text(res), /flaky charge succeeded \(attempt 2\)/);
+    const state = JSON.parse(text(await call(client, "flaky_charge_state")));
+    assert.equal(state.executions, 1, "exactly one effect");
+    assert.equal(state.attempts, 2, "replay happened");
+  } finally {
+    await client.close();
+  }
+});
+
+test("reconcile could_not_determine: unusable read target means hold, never absent", async () => {
+  const dir = mkdtempSync(path.join(tmpdir(), "mcp-fuse-test-"));
+  const configPath = path.join(dir, "fuse.config.json");
+  writeFileSync(
+    configPath,
+    JSON.stringify({
+      tools: { charge_card: { reconcile: { tool: "no_such_read", countField: "executions" } } },
+    }),
+  );
+  const client = await connectThroughProxy(["--config", configPath]);
+  try {
+    const res = await call(client, "charge_card");
+    assert.equal(res.isError, true);
+    assert.match(text(res), /could not determine the outcome/);
+    assert.equal(mep(res)?.reconcile?.verdict, "could_not_determine");
+    const count = await call(client, "charge_attempts");
+    assert.equal(text(count), "1", "held: no replay on an unverifiable outcome");
   } finally {
     await client.close();
   }

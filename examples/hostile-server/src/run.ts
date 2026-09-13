@@ -11,7 +11,7 @@
  */
 import path from "node:path";
 import { createRequire } from "node:module";
-import { existsSync, mkdtempSync, readFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
@@ -100,6 +100,22 @@ function readLedger(stateFile: string): LedgerState {
   return JSON.parse(readFileSync(stateFile, "utf8")) as LedgerState;
 }
 
+let reconcileConfigPath: string | undefined;
+function reconcileConfig(): string {
+  if (reconcileConfigPath === undefined) {
+    reconcileConfigPath = path.join(mkdtempSync(path.join(tmpdir(), "mcp-fuse-battery-cfg-")), "fuse.config.json");
+    writeFileSync(
+      reconcileConfigPath,
+      JSON.stringify({
+        tools: {
+          charge: { reconcile: { tool: "verify_charge", args: { orderId: "orderId" }, countField: "executions" } },
+        },
+      }),
+    );
+  }
+  return reconcileConfigPath;
+}
+
 async function runMode(mode: string): Promise<ModeResult> {
   const stateFile = freshStatePath(mode);
   const childEnv = {
@@ -108,7 +124,7 @@ async function runMode(mode: string): Promise<ModeResult> {
   };
   const transport = new StdioClientTransport({
     command: process.execPath,
-    args: [fuseCli, "wrap", "--", process.execPath, serverJs, mode],
+    args: [fuseCli, "wrap", "--config", reconcileConfig(), "--", process.execPath, serverJs, mode],
     env: childEnv,
     stderr: "ignore",
   });

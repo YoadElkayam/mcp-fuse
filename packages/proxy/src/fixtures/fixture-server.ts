@@ -57,6 +57,32 @@ server.registerTool(
 );
 
 server.registerTool(
+  "charge_state",
+  { description: "JSON effect count for charge_card.", annotations: { readOnlyHint: true } },
+  async () => ({ content: [{ type: "text", text: JSON.stringify({ executions: chargeAttempts }) }] }),
+);
+
+let flakyChargeAttempts = 0;
+let flakyChargeEffects = 0;
+server.registerTool(
+  "flaky_charge",
+  { description: "Non-idempotent; first attempt fails BEFORE the effect lands, second succeeds." },
+  async () => {
+    flakyChargeAttempts += 1;
+    if (flakyChargeAttempts === 1) {
+      return { isError: true, content: [{ type: "text", text: "ETIMEDOUT: gateway timed out before processing" }] };
+    }
+    flakyChargeEffects += 1;
+    return { content: [{ type: "text", text: `flaky charge succeeded (attempt ${flakyChargeAttempts})` }] };
+  },
+);
+server.registerTool(
+  "flaky_charge_state",
+  { description: "JSON effect count for flaky_charge.", annotations: { readOnlyHint: true } },
+  async () => ({ content: [{ type: "text", text: JSON.stringify({ executions: flakyChargeEffects, attempts: flakyChargeAttempts }) }] }),
+);
+
+server.registerTool(
   "always_503",
   { description: "Always fails with 503.", annotations: { readOnlyHint: true } },
   async () => {

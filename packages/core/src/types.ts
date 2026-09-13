@@ -44,6 +44,11 @@ export interface ErrorPolicy {
   retryable?: boolean;
   retry?: RetryDirective;
   circuit?: CircuitDirective;
+  /** Outcome of a reconciliation read run for this call, when one was declared. */
+  reconcile?: {
+    tool: string;
+    verdict: "found_once" | "authoritatively_absent" | "found_multiple" | "could_not_determine";
+  };
   /** The ONLY text intended for the model. Imperative, ≤500 chars, no stack traces. */
   agentGuidance?: string;
   /** Diagnostic detail for logs/humans. Never forwarded to the model. */

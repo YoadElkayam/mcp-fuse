@@ -3,6 +3,7 @@ import { test } from "node:test";
 import { classify } from "./classifier.js";
 import { CircuitBreaker } from "./circuit-breaker.js";
 import { silentRetryAllowed } from "./idempotency.js";
+import { interpretEffectCount } from "./reconcile.js";
 import { nextRetry } from "./retry.js";
 import type { ErrorPolicy } from "./types.js";
 
@@ -134,6 +135,16 @@ test("idempotency gate: ambiguous failures never replay against non-idempotent t
 
   const auth: ErrorPolicy = { version: "1", category: "auth", retryable: false };
   assert.equal(silentRetryAllowed(auth, true), false);
+});
+
+test("interpretEffectCount: four verdicts; anything unclean is could_not_determine", () => {
+  // imported at top
+  assert.equal(interpretEffectCount(0), "authoritatively_absent");
+  assert.equal(interpretEffectCount(1), "found_once");
+  assert.equal(interpretEffectCount(3), "found_multiple");
+  for (const bad of [undefined, null, "1", -1, 1.5, Number.NaN, {}, true]) {
+    assert.equal(interpretEffectCount(bad), "could_not_determine", `bad value: ${String(bad)}`);
+  }
 });
 
 test("circuit breaker: forceCooldown opens for the given duration without a failure count", () => {

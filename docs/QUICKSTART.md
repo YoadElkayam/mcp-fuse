@@ -56,6 +56,11 @@ Change the server entry in your host config:
   side-effect tools fail fast with "verify before re-invoking" guidance.
 - **At most ONE compact error message per failure** reaches the model, with a
   machine-readable [MCP Error Policy](../spec/README.md) payload under `_meta`.
+- **Ambiguous outcomes get verified, not guessed** (0.3.0+): declare which
+  read-only tool answers "did this land?" for a side-effecting tool, and on an
+  ambiguous failure the proxy runs it: verified-complete tells the agent it is
+  done, verified-absent safely replays once, anything unclear holds. A failed
+  verification is never treated as "it did not happen".
 
 ## Configuration (optional — defaults are safe)
 
@@ -69,7 +74,10 @@ Change the server entry in your host config:
   },
   "circuit": { "failureThreshold": 5, "reopenAfterMs": 30000 },
   "tools": {
-    "legacy_search": { "assumeIdempotent": true }  // un-annotated but safe to retry
+    "legacy_search": { "assumeIdempotent": true },  // un-annotated but safe to retry
+    "charge": {                                     // SEP 4.3 reconciliation read
+      "reconcile": { "tool": "verify_charge", "args": { "orderId": "orderId" }, "countField": "executions" }
+    }
   },
   "log": { "file": "/tmp/mcp-fuse.jsonl", "verbose": false }
 }

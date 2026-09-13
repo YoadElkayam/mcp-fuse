@@ -53,6 +53,18 @@
         "reopenAfterMs": { "type": "integer", "minimum": 0 }
       }
     },
+    "reconcile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tool"],
+      "properties": {
+        "tool": { "type": "string", "description": "The declared read-only tool that answers whether the effect happened." },
+        "verdict": {
+          "enum": ["found_once", "authoritatively_absent", "found_multiple", "could_not_determine"],
+          "description": "Outcome of running the reconciliation read. could_not_determine is terminal for automatic handling and MUST NOT be treated as absent."
+        }
+      }
+    },
     "agentGuidance": {
       "type": "string",
       "maxLength": 500,

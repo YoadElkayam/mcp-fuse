@@ -9,3 +9,4 @@ export {
 } from "./circuit-breaker.js";
 export { FuseMetrics } from "./metrics.js";
 export { silentRetryAllowed, NON_IDEMPOTENT_GUIDANCE, type GateContext } from "./idempotency.js";
+export { interpretEffectCount, type ReconcileVerdict, type ReconcileDeclaration } from "./reconcile.js";
