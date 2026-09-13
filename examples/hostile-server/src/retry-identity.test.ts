@@ -73,6 +73,7 @@ function observed(overrides: Partial<ModeResult>): ModeResult {
     secondExecutions: 0,
     keyAttempts: 0,
     safeAttempts: 0,
+    verifyCalls: 0,
     wallMs: 0,
     clientSaw: "",
     ...overrides,

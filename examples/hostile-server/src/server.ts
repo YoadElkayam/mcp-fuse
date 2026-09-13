@@ -40,6 +40,9 @@ interface LedgerState {
   keyedOrderIds: Record<string, string>;
   keyedAttempts: Record<string, number>;
   safeAttempts: number;
+  /** How many times the reconciliation read was attempted. A client that never
+   * attempts it has demonstrated nothing about its read path (not_exercised). */
+  verifyCalls: number;
 }
 
 const statePathEnv = "HOSTILE_SERVER_STATE_PATH";
@@ -51,6 +54,7 @@ function emptyState(): LedgerState {
     keyedOrderIds: {},
     keyedAttempts: {},
     safeAttempts: 0,
+    verifyCalls: 0,
   };
 }
 
@@ -63,6 +67,7 @@ function loadState(): LedgerState {
     keyedOrderIds: parsed.keyedOrderIds ?? {},
     keyedAttempts: parsed.keyedAttempts ?? {},
     safeAttempts: parsed.safeAttempts ?? 0,
+    verifyCalls: parsed.verifyCalls ?? 0,
   };
 }
 
@@ -84,6 +89,7 @@ function persistState(): void {
       keyedOrderIds: Object.fromEntries(keyedOrderIds),
       keyedAttempts: Object.fromEntries(keyedAttempts),
       safeAttempts,
+      verifyCalls,
     } satisfies LedgerState)}\n`,
   );
 }
@@ -157,6 +163,7 @@ server.registerTool(
 );
 
 let safeAttempts = initialState.safeAttempts;
+let verifyCalls = initialState.verifyCalls;
 server.registerTool(
   "charge_safe",
   {
@@ -233,6 +240,8 @@ server.registerTool(
     annotations: { readOnlyHint: true, idempotentHint: true },
   },
   async ({ orderId }) => {
+    verifyCalls += 1;
+    persistState();
     if (mode === "verify-unavailable") {
       // The recursive case: the read that answers "did this land?" is itself down.
       return { isError: true, content: [{ type: "text", text: "HTTP 503 Service Unavailable: ledger shard offline" }] };

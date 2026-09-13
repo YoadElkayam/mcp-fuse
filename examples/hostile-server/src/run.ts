@@ -28,6 +28,10 @@ export interface Case {
   expectation: string;
   /** Per-mode pass condition — several modes invert a naive global "effects <= 1" rule. */
   pass: (r: ModeResult) => boolean;
+  /** When the pass condition holds but the behavior under test was never attempted,
+   * the run supports no verdict: report not_exercised, never count it as a pass
+   * ("holding is not proving" — aurumflux20, #3188). */
+  notExercised?: (r: ModeResult) => boolean;
   verdictLabel: string;
 }
 
@@ -40,6 +44,7 @@ interface LedgerState {
   executions?: Record<string, number>;
   keyedAttempts?: Record<string, number>;
   safeAttempts?: number;
+  verifyCalls?: number;
 }
 
 export interface ModeResult {
@@ -47,6 +52,7 @@ export interface ModeResult {
   secondExecutions: number;
   keyAttempts: number;
   safeAttempts: number;
+  verifyCalls: number;
   wallMs: number;
   clientSaw: string;
 }
@@ -57,7 +63,7 @@ export const BATTERY: Case[] = [
   { mode: "5xx-after-settle", expectation: "5xx after the effect landed: must NOT replay a side-effecting tool", pass: atMostOnce, verdictLabel: "effect==1" },
   { mode: "duplicate", expectation: "429 after the effect landed: a server response is not proof of non-execution; must NOT replay", pass: atMostOnce, verdictLabel: "effect==1" },
   { mode: "slow-answer", expectation: "late success: must NOT replay after a deadline", pass: atMostOnce, verdictLabel: "effect==1" },
-  { mode: "verify-unavailable", expectation: "reconciliation read down: could-not-determine is terminal; hold, never replay", pass: atMostOnce, verdictLabel: "effect==1" },
+  { mode: "verify-unavailable", expectation: "reconciliation read down: could-not-determine is terminal; hold, never replay", pass: atMostOnce, notExercised: (r) => r.verifyCalls === 0, verdictLabel: "effect==1 & read attempted" },
   { mode: "retry-original-key", expectation: "effect landed then the child closed without a tool result: automatic replay must keep the original idempotency key", pass: (r) => r.executions === 1 && r.keyAttempts === 2, verdictLabel: "effect==1 & key attempts==2" },
   { mode: "distinct-operation-key", expectation: "distinct logical operations must use distinct idempotency keys, producing two effects", pass: (r) => r.executions === 1 && r.secondExecutions === 1, verdictLabel: "order1==1 & order2==1" },
   { mode: "declared-safe", expectation: "tool declares safe-to-replay: replay IS expected (attempts >= 2, effect == 1)", pass: (r) => r.safeAttempts >= 2 && r.executions === 1, verdictLabel: "attempts>=2 & effect==1" },
@@ -145,7 +151,8 @@ async function runMode(mode: string): Promise<ModeResult> {
   const secondExecutions = ledger.executions?.["order-2"] ?? 0;
   const keyAttempts = keyedAttemptName === undefined ? 0 : (ledger.keyedAttempts?.[keyedAttemptName] ?? 0);
   const safeAttempts = ledger.safeAttempts ?? 0;
-  return { executions, secondExecutions, keyAttempts, safeAttempts, wallMs, clientSaw };
+  const verifyCalls = ledger.verifyCalls ?? 0;
+  return { executions, secondExecutions, keyAttempts, safeAttempts, verifyCalls, wallMs, clientSaw };
 }
 
 export async function main(): Promise<number> {
@@ -153,18 +160,34 @@ export async function main(): Promise<number> {
   console.log(" mode                   | effects | verdict | wall ms | client saw");
   console.log("------------------------|---------|---------|---------|-----------------------------------------");
   let failures = 0;
+  let notExercised = 0;
   for (const c of BATTERY) {
     const r = await runMode(c.mode);
     const pass = scoreMode(c.mode, r);
-    if (!pass) failures += 1;
+    let verdict: string;
+    if (!pass) {
+      failures += 1;
+      verdict = "FAIL";
+    } else if (c.notExercised?.(r)) {
+      notExercised += 1;
+      verdict = "NOT-EX";
+    } else {
+      verdict = "PASS";
+    }
     const effects = r.executions + r.secondExecutions;
     console.log(
-      ` ${c.mode.padEnd(22)} | ${String(effects).padStart(7)} | ${(pass ? "PASS" : "FAIL").padEnd(7)} | ${String(r.wallMs).padStart(7)} | ${r.clientSaw}`,
+      ` ${c.mode.padEnd(22)} | ${String(effects).padStart(7)} | ${verdict.padEnd(7)} | ${String(r.wallMs).padStart(7)} | ${r.clientSaw}`,
     );
   }
   console.log("\nExpectations:");
   for (const c of BATTERY) console.log(` - ${c.mode}: ${c.expectation}`);
-  console.log(`\n${failures === 0 ? "ALL PASS" : `${failures} mode(s) failed pass conditions`}`);
+  const passes = BATTERY.length - failures - notExercised;
+  console.log(
+    `\n${passes} pass, ${failures} fail, ${notExercised} not exercised` +
+      (notExercised > 0
+        ? " (not_exercised = the behavior under test was never attempted; it supports no verdict and is never counted as a pass)"
+        : ""),
+  );
   return failures === 0 ? 0 : 1;
 }
 

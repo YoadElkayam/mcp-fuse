@@ -89,6 +89,11 @@ other direction: the battery polices over-refusing, not just over-firing.
 - Resolve the reference proxy's real dropped-response retry failure while
   preserving the original key. The fixture exists; this invariant is not yet
   satisfied by the reference proxy. Runtime/proxy changes are outside this PR.
+- Slow reconcile read (aurumflux20): the read is healthy but slower than the
+  client's timeout; a client-side timeout must not collapse into "absent".
+- Stale reconcile read (aurumflux20): a read replica behind the write answers
+  "absent" authoritatively, correctly, and wrongly; may require read-your-writes
+  language before it is testable.
 - Reconcile-endpoint misbehavior (soul-sol, #3188): drive the reconciliation read
   through an oversized body (beyond pipe-buffer size), a soft-404 (HTTP 200 whose
   content is "not available" prose), and a truncated response; assert each maps to
@@ -110,6 +115,15 @@ broken client as passing `declared-safe` or `distinct-operation-key` when work w
 not performed. A suite that ignores idempotency-key attempts will miss the
 `retry-original-key` failure where a rotated key creates a duplicate effect.
 Implementations should score per-mode intent, not a single global rule.
+
+Two further scoring rules, adopted 2026-09-13 after aurumflux20 found a false-pass
+bug in his own upstream battery (no reconcile route; untouched modes scored SAFE):
+the reconciliation read must be served **raw** (a fixture returning pre-mapped
+verdicts tests itself), and a run that never attempts the read scores
+**`not_exercised`** — reported, never counted as a pass. Our own runner now applies
+this: mcp-fuse scores `not_exercised` on `verify-unavailable` because it holds
+without ever attempting reconciliation; implementing the reconcile read in the
+proxy is the roadmap item that turns that row green honestly.
 
 Both modes are implemented in the upstream battery
 ([hostile-facilitator](https://github.com/aurumflux20/hostile-facilitator), 7 modes,

@@ -238,6 +238,14 @@ Two requirements follow:
   must return settled and one that must return not-settled. A checker validated
   only against the negative is indistinguishable from a function that returns a
   constant.
+- A conformance fixture MUST expose the reconciliation read as the raw response,
+  never as a pre-mapped verdict: a fixture that hands the client a clean verdict is
+  testing itself, not the client's plumbing.
+- A run in which the client never attempts the reconciliation read supports no
+  verdict about the read path. Conformance suites MUST score it `not_exercised`,
+  distinct from both pass and fail, and MUST NOT count it toward conformance:
+  holding is not proving. (Both after aurumflux20's battery correction in #3188,
+  which found its own instrument scoring untouched modes as safe.)
 
 [plumb]: https://github.com/modelcontextprotocol/modelcontextprotocol/discussions/3188
 
