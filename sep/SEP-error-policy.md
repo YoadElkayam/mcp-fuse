@@ -148,8 +148,15 @@ Field semantics:
   `policy_blocked` is deliberately distinct from `permission`: permission is about
   the caller's identity, governance is about the action itself being disallowed,
   and the correct client responses differ, because re-authenticating cannot fix a
-  policy refusal. Granular server-defined codes stay free-form in `detail` for
-  operators; servers can add codes without breaking client logic.
+  policy refusal.
+
+  Granular codes stay server-defined and out of the closed enum, carried in an
+  optional `code` field (stable, lowercase, ≤64 chars). Clients MUST NOT branch on
+  `code`; it exists for operators and support tooling, alongside `correlationId`.
+  Domain-specific code sets (payments being the first, after slowe89 in #2930)
+  live as profiles under [`profiles/`](../sep/profiles/) rather than growing the
+  category enum: the enum is a client behavior contract, and "payment header
+  invalid" demands the same client behavior as any other `invalid_input`.
 - `retryable`: whether the identical request can ever succeed. Defaults per category.
 - `retry.afterMs`: earliest time at which a retry may succeed. This is a "not
   before" bound. Clients MUST NOT retry earlier. Clients whose own deadline falls

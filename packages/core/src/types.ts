@@ -44,6 +44,9 @@ export interface ErrorPolicy {
   retryable?: boolean;
   retry?: RetryDirective;
   circuit?: CircuitDirective;
+  /** Server-defined stable granular code for operators (e.g. "payment_header_invalid").
+   * Never for client branching: clients branch on category/class only. */
+  code?: string;
   /** Outcome of a reconciliation read run for this call, when one was declared. */
   reconcile?: {
     tool: string;

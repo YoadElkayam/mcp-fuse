@@ -53,6 +53,12 @@
         "reopenAfterMs": { "type": "integer", "minimum": 0 }
       }
     },
+    "code": {
+      "type": "string",
+      "maxLength": 64,
+      "pattern": "^[a-z0-9_.:-]+$",
+      "description": "Server-defined stable granular code for operators and support tooling. Clients MUST NOT branch on it; client behavior follows category/class only. Domain profiles (e.g. payments) recommend code sets."
+    },
     "reconcile": {
       "type": "object",
       "additionalProperties": false,
