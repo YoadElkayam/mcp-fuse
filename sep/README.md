@@ -1,5 +1,13 @@
 # Shared SEP draft: structured error policy for MCP
 
+> **Status update (2026-11-22):** the classification layer of this work is moving
+> as [SEP-3313 (PR #3313)](https://github.com/modelcontextprotocol/modelcontextprotocol/pull/3313)
+> by @johnyzaguirre-glean, which credits and links this draft and defers the
+> retry-safety semantics (effect classes, replay gate, reconciliation) to it.
+> Maintainer routing: through the forming Core Primitives Working Group. This
+> draft remains the richer companion and the home of the reference
+> implementation and conformance battery.
+
 This folder is the working draft for a Specification Enhancement Proposal that grew
 out of two spec discussions:
 
