@@ -4,10 +4,11 @@
  *
  *   mcp-fuse init [--file <config>] [--dry-run] [--unwrap] [--fuse-config <file>]
  *   mcp-fuse wrap [--config fuse.config.json] [--verbose] [--log-file <file>] -- <server command...>
- *   mcp-fuse proxy --target <url> [--port <port>]     (M3, not yet implemented)
+ *   mcp-fuse proxy --target <url> [--port <port>] [--path /mcp] [--config <file>]
  */
 import { readFileSync } from "node:fs";
 import { DEFAULT_CIRCUIT_OPTIONS } from "mcp-fuse-core";
+import { HttpProxy } from "./http-proxy.js";
 import { runInit } from "./init.js";
 import { StdioProxy } from "./stdio-proxy.js";
 
@@ -27,7 +28,8 @@ function usage(): never {
       "      Targets the project .mcp.json when present; add --all for global host configs too.",
       "  mcp-fuse wrap [--config <file>] [--verbose] [--log-file <file>] -- <server command...>",
       "      Run one MCP server behind the resilience proxy.",
-      "  mcp-fuse proxy --target <url> [--port <port>]      (not yet implemented)",
+      "  mcp-fuse proxy --target <url> [--port <port>] [--path /mcp] [--config <file>]",
+      "      Streamable HTTP reverse proxy with the same resilience pipeline.",
     ].join("\n"),
   );
   process.exit(2);
@@ -79,8 +81,26 @@ switch (command) {
     break;
   }
   case "proxy": {
-    console.error("mcp-fuse: HTTP proxy mode is not implemented yet (see docs/DESIGN.md M3)");
-    process.exit(1);
+    const target = flagValue(rest, "--target");
+    if (!target) usage();
+    let config: { defaults?: { maxAbsorptionMs?: number; maxAbsorptionWithProgressMs?: number }; circuit?: { failureThreshold?: number; reopenAfterMs?: number }; tools?: Record<string, never>; log?: { file?: string; verbose?: boolean } } = {};
+    const cf = flagValue(rest, "--config");
+    if (cf) config = JSON.parse(readFileSync(cf, "utf8"));
+    const proxy = new HttpProxy({
+      target,
+      port: Number(flagValue(rest, "--port") ?? 9090),
+      path: flagValue(rest, "--path"),
+      maxAbsorptionMs: config.defaults?.maxAbsorptionMs,
+      maxAbsorptionWithProgressMs: config.defaults?.maxAbsorptionWithProgressMs,
+      circuit: config.circuit ? { ...DEFAULT_CIRCUIT_OPTIONS, ...config.circuit } : undefined,
+      tools: config.tools,
+      verbose: rest.includes("--verbose") || config.log?.verbose,
+      logFile: flagValue(rest, "--log-file") ?? config.log?.file,
+    });
+    proxy.start().catch((err) => {
+      console.error("mcp-fuse: fatal:", err);
+      process.exit(1);
+    });
     break;
   }
   default:

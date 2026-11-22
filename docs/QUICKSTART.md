@@ -101,5 +101,5 @@ The fuse suppresses errors from the *model's context*, never from you:
 | Wrapped server can't find its API key | Fixed in ≥0.1.0 (full env passthrough). Update mcp-fuse. |
 | Host reports the tool call timed out | Your host's tool timeout is below the absorption budget — lower `maxAbsorptionMs`. |
 | A safe tool isn't being retried | Its server doesn't set `idempotentHint`/`readOnlyHint`. Add `"tools": {"<name>": {"assumeIdempotent": true}}`. |
-| HTTP/SSE servers | Not wrappable yet — stdio only until M3. `init` skips them and says so. |
+| HTTP/Streamable servers | Use `mcp-fuse proxy --target <url>` (reverse proxy mode). `init` only wraps stdio entries. |
 | Something looks swallowed | Run with `--verbose` or check the JSONL log — every suppressed byte is there. |

@@ -6,7 +6,7 @@
 
 **Deterministic failure handling for MCP. Stop letting your LLM debug your network.**
 
-> Status: **alpha** — working stdio proxy + MEP spec draft, published to npm. HTTP proxy mode and the official-spec (SEP) push are on the [roadmap](docs/DESIGN.md).
+> Status: **alpha** — working stdio + Streamable HTTP proxies + MEP spec draft, published to npm. The official-spec (SEP) push is on the [roadmap](docs/DESIGN.md).
 
 ## The problem
 
@@ -61,8 +61,14 @@ Or wrap a single server:
 npx mcp-fuse wrap -- npx -y @modelcontextprotocol/server-github
 ```
 
+Or front a Streamable HTTP server with the same resilience pipeline:
+
+```bash
+npx mcp-fuse proxy --target https://api.example.com/mcp --port 9090
+# point your host at http://localhost:9090/mcp
+```
+
 Full guide (config reference, debugging, troubleshooting): [docs/QUICKSTART.md](docs/QUICKSTART.md).
-HTTP/Streamable servers aren't wrappable yet (M3 on the [roadmap](docs/DESIGN.md)).
 
 That's it. Rate limits get honored, transient failures get retried with exponential
 backoff, dead services get circuit-broken — and your agent sees at most one clean

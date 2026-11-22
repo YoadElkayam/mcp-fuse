@@ -279,7 +279,7 @@ report.
 | **M0 — Spec draft** | `spec/` v1alpha: schema, transport mapping, category semantics | Schema validates all examples; 2 external reviewers read it |
 | **M1 — Core engine** | classifier + retry + breaker in `mcp-fuse-core`, fully unit-tested | Classifier corpus ≥ 50 real-world error samples, all categorized correctly |
 | **M2 — stdio wrapper MVP** | `mcp-fuse wrap` works with real servers (filesystem, fetch, the flaky demo server) | Demo: agent + flaky server, before/after token counts across scripted scenarios, recorded |
-| **M3 — HTTP proxy + metrics** | `mcp-fuse proxy`, session summary, JSONL logs | Fronting a real Streamable HTTP server in CI |
+| **M3 — HTTP proxy + metrics** ✅ (v0.4.0) | `mcp-fuse proxy`, session summary, JSONL logs | Fronting a real Streamable HTTP server in CI (in-process integration test: identity mirroring, absorption, idempotency gate) |
 | **M4 — Launch** | npm publish, README with demo GIF + ROI numbers, blog post, submit to MCP community | First external issue filed 🎉 |
 | **M5 — Standardization** | SEP draft for `io.modelcontextprotocol/error-policy`, host-side adoption conversations | SEP submitted with adoption data |
 | **M6 — Java middleware** | Port of core + servlet/Spring filter, from the language-neutral spec + conformance suite | Passes the same conformance examples |
